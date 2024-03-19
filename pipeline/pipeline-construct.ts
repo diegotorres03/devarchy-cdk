@@ -97,6 +97,10 @@ export class PipeConstruct extends Construct {
     constructor(scope: Construct, id: string, props?: { account?: string, region?: string }) {
         super(scope, id)
 
+        // CodePipeline.Artifact 
+        this.sourceOutput = new CodePipeline.Artifact()
+
+
         this.account = props?.account || Stack.of(this).account || process.env.CDK_DEFAULT_ACCOUNT || 'no-account'
         this.region = props?.region || Stack.of(this).region || process.env.CDK_DEFAULT_REGION || 'no-region'
 
@@ -159,7 +163,6 @@ export class PipeConstruct extends Construct {
      * @memberof PipeConstruct
      */
     source(codeRepo: CodeCommit.Repository, branch = 'main') {
-        this.sourceOutput = new CodePipeline.Artifact()
         const sourceAction = new CodePipelineActions.CodeCommitSourceAction({
             actionName: 'CodeCommit',
             repository: codeRepo,
