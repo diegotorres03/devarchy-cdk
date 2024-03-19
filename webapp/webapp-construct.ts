@@ -11,8 +11,9 @@ import {
   CfnOutput,
   RemovalPolicy,
   Duration,
-} from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+} from 'aws-cdk-lib'
+
+import { Construct } from 'constructs'
 
 
 import { FunctionConstruct } from '../compute';
