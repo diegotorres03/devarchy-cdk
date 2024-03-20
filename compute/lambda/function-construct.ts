@@ -29,10 +29,10 @@ export interface FunctionOptions {
   readonly name?: string;
   readonly env?: { [key: string]: string };
   readonly timeout?: Duration;
-  // readonly access: Function[];
+  readonly access?: Function[];
   readonly vpc?: EC2.Vpc | string;
   readonly securityGroupIds?: string[];
-  readonly layers?: string[]; // Lambda.ILayerVersion[];
+  readonly layers?: { name: string, path: string }[]; // Lambda.ILayerVersion[];
 }
 
 export class FunctionConstruct extends Construct {
@@ -132,7 +132,7 @@ export class FunctionConstruct extends Construct {
 
 
     const lambdaParams = {
-      runtime: Lambda.Runtime.NODEJS_14_X,
+      runtime: Lambda.Runtime.NODEJS_LATEST,
       code: getCode(functionCode),
       timeout: options.timeout || Duration.seconds(30),
       layers: this.layersToUse,
@@ -145,6 +145,18 @@ export class FunctionConstruct extends Construct {
     } as Lambda.FunctionProps;
 
     this.handlerFn = new Lambda.Function(this, name + '-handler', lambdaParams);
+
+
+    // granting access to external resources
+    if (Array.isArray(options.access)) {
+      options.access.forEach(accessFn => accessFn(this.handlerFn))
+    }
+
+    // creating and adding layers
+    if (options.layers) {
+      options.layers.forEach(layer => this.createLayer(layer.name, layer.path))
+    }
+
 
     if (!this.handlerFn) throw new Error('something went wrong, this.handlerFn should not be empty');
 

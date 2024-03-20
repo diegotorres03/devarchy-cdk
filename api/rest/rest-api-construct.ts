@@ -2,6 +2,9 @@
 import * as ApiGateway from 'aws-cdk-lib/aws-apigateway';
 import * as Dynamo from 'aws-cdk-lib/aws-dynamodb';
 import * as Lambda from 'aws-cdk-lib/aws-lambda';
+
+import * as IAM from 'aws-cdk-lib/aws-iam';
+
 import { Construct } from 'constructs';
 import { FunctionConstruct, FunctionOptions } from '../../compute';
 // import { WebAppConstruct } from '../../webapp/webapp-construct'
@@ -22,7 +25,7 @@ export class RestApiConstruct extends Construct {
 
   private currentAuthorizer?: ApiGateway.RequestAuthorizer; // Lambda.Function
   private currentHandler?: Lambda.Function;
-  private api: ApiGateway.RestApi;
+  api: ApiGateway.RestApi;
 
 
   constructor(scope: Construct, id: string) {
@@ -161,7 +164,20 @@ export class RestApiConstruct extends Construct {
     return this;
   }
 
-  private createMethodIntegration(method: string, path: string, handlerCode: string, options?: FunctionOptions) {
+  /**
+   * create a lambda integration
+   * the code variable can be js code as a string, 'async (event) => {}'
+   * the path to a local folder './path/to/code/folder'
+   * or the path to an s3 bucket  's3://bucket/path/to/code'
+   *
+   * @private
+   * @param {string} method
+   * @param {string} path
+   * @param {string} handlerCode
+   * @param {FunctionOptions} [options]
+   * @memberof RestApiConstruct
+   */
+  private createLambdaIntegration(method: string, path: string, handlerCode: string, options?: FunctionOptions) {
 
     console.log('use authorizer here', this.currentAuthorizer);
     const fn = new FunctionConstruct(this, `${method}_${path}_handler`);
@@ -177,34 +193,301 @@ export class RestApiConstruct extends Construct {
     this.currentHandler = fn.handlerFn;
   }
 
-  get(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('GET', path, handlerCode, options);
-    return this;
+  /**
+   * Create an ApiGateway Mock integration,
+   * just pass the json object you want as response
+   * as the mockResponse object
+   * and enjoy
+   *
+   * @private
+   * @param {string} method
+   * @param {string} path
+   * @param {Object} mockResponse - desired endpoint response
+   * @memberof RestApiConstruct
+   */
+  private createMockIntegration(method: string, path: string, mockResponse: any) {
+
+    const integration = new ApiGateway.MockIntegration({
+      integrationResponses: [
+        {
+          statusCode: '200',
+          responseTemplates: { 'application/json': JSON.stringify(mockResponse) }
+        },
+      ],
+      passthroughBehavior: ApiGateway.PassthroughBehavior.NEVER,
+      requestTemplates: { 'application/json': '{ "statusCode": 200 }' },
+    })
+
+    // const integrationOptions: ApiGateway.MethodOptions = this.currentAuthorizer ?
+    //   { authorizer: this.currentAuthorizer } :
+    //   undefined
+
+    const integrationOptions: ApiGateway.MethodOptions = {
+      authorizer: this.currentAuthorizer || undefined,
+      methodResponses: [{ statusCode: '200', }]
+    }
+
+    this.api.root.resourceForPath(path)
+      .addMethod(method, integration, integrationOptions);
+
   }
 
-  post(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('POST', path, handlerCode, options);
-    return this;
+  private createHTTPIntegration(method: string, path: string, url: string) {
+    const integration = new ApiGateway.HttpIntegration(url)
+
+    this.api.root.resourceForPath(path)
+      .addMethod(method, integration, {
+        methodResponses: [{ statusCode: '200', }],
+        authorizer: this.currentAuthorizer || undefined,
+      });
+
   }
 
-  put(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('PUT', path, handlerCode, options);
-    return this;
+  private handleIntegration(
+    method: string,
+    path: string,
+    handlerCode?: string | Function | Object,
+    options?: FunctionOptions) {
+    if (!handlerCode) {
+
+      return {
+        // [ ] how can I give access???
+        dynamodb: (table: Dynamo.Table, options?: {
+          access?: Function[],
+          requestTemplates?: { [contentType: string]: string },
+          integrationResponses?: {
+            statusCode: string,
+            responseTemplates: { [contentType: string]: string }
+          }[]
+        }) => {
+
+          const methodMap = {
+            get: {
+              action: 'GetItem',
+              requestTemplates: {
+                'application/json': `
+                #set($partitionKey = $input.params('${table.schema().partitionKey.name}'))
+                #set($sortKey = $input.params('${table.schema().sortKey?.name}'))
+
+                {
+                  "TableName": "${table.tableName}",
+                  "Key": {
+                    "${table.schema().partitionKey.name}": { 
+                      "S": "$partitionKey"
+                    }
+                    ${table.schema().sortKey?.name ? `,
+                    "${table.schema().sortKey?.name}": {
+                      "S": "$sortKey"
+                    }`: ''}
+                    
+                  }
+                }
+                `
+
+              },
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  // #set($inputRoot = $input.path('$'))
+                  // #set($response = $util.toJson($inputRoot))
+                  'application/json': `$input.body`
+                }
+              }]
+
+            },
+            post: {
+              action: 'PutItem',
+              requestTemplates: {
+                'application/json': `
+                #set($inputRoot = $input.path('$') )
+                {
+                  "TableName": "${table.tableName}",
+                  "Item": $input.body
+                }
+              `},
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  'application/json': `
+                    #set($inputRoot = $input.path('$'))
+                    $inputRoot`
+                }
+              }]
+
+            },
+            put: {
+              action: 'PutItem',
+              requestTemplates: {
+                'application/json': `
+                #set($inputRoot = $input.path('$') )
+                {
+                  "TableName": "${table.tableName}",
+                  "Item": $input.body
+                }
+              `},
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  'application/json': `
+                    #set($inputRoot = $input.path('$'))
+                    $inputRoot`
+                }
+              }]
+
+            },
+            delete: {
+              action: 'DeleteItem',
+              requestTemplates: {
+                'application/json': `
+                #set($partitionKey = $input.params('${table.schema().partitionKey.name}'))
+                #set($sortKey = $input.params('${table.schema().sortKey?.name}'))
+
+                {
+                  "TableName": "${table.tableName}",
+                  "Key": {
+                    "${table.schema().partitionKey.name}": { 
+                      "S": "$partitionKey"
+                    }
+                    ${table.schema().sortKey?.name ? `,
+                    "${table.schema().sortKey?.name}": {
+                      "S": "$sortKey"
+                    }`: ''}
+                    
+                  }
+                }
+                `
+
+              },
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  'application/json': `
+                    #set($inputRoot = $input.path('$'))
+                    $inputRoot`
+                }
+              }]
+            },
+            patch: {
+              action: 'UpdateItem',
+              requestTemplates: ``,
+              integrationResponses: [
+                {}
+              ]
+
+            },
+          }
+
+
+          const methodRole = new IAM.Role(this, `${method}-${path}-integration-role`, {
+            assumedBy: new IAM.ServicePrincipal('apigateway.amazonaws.com'),
+          })
+
+          // docs on velocity utils and stuff https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
+
+          const methodTemplate = methodMap[method.toLowerCase()]
+          const dynamoIntegration = new ApiGateway.AwsIntegration({
+            service: 'dynamodb',
+            action: methodTemplate.action || 'GetItem',
+            options: {
+              credentialsRole: methodRole,
+              // credentialsPassthrough: true,
+
+              integrationResponses: options
+                && options.integrationResponses ||
+                methodTemplate.integrationResponses,
+
+              requestTemplates: options &&
+                options.requestTemplates ||
+                methodTemplate.requestTemplates,
+            }
+          })
+
+          const apiMethod = this.api.root.resourceForPath(path)
+            .addMethod(method, dynamoIntegration, {
+              methodResponses: [{ statusCode: '200', }],
+              authorizer: this.currentAuthorizer || undefined,
+
+            })
+
+          let dynamo = {} as Dynamo.Table;
+
+
+          if (options && Array.isArray(options.access)) {
+            options.access.forEach(accessFn => accessFn(methodRole))
+          }
+
+        },
+        // sqs(params) { },
+        // sns(params) { },
+        // stepFunctions(params) { },
+        // s3(params) { },
+        // mock(params) { },
+        // http(params) { },
+        // fn(params) { },
+
+
+      }
+    }
+
+    let code = handlerCode
+    if (typeof code === 'object') {
+      this.createMockIntegration(method, path, code)
+      return
+    }
+    if (typeof code === 'function') code = code.toString()
+
+    if (typeof code !== 'string') throw new Error("I wasn't able to resolve the code");
+
+    if (code.startsWith('http')) {
+      this.createHTTPIntegration(method, path, code)
+      return
+    }
+
+    this.createLambdaIntegration(method, path, code, options);
+    return
   }
 
-  delete(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('DELETE', path, handlerCode, options);
-    return this;
+  get(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('GET', path, handlerCode, options);
+
   }
 
-  options(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('OPTIONS', path, handlerCode, options);
-    return this;
+  post(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('POST', path, handlerCode, options);
+    
   }
 
-  head(path: string, handlerCode: string, options?: FunctionOptions): RestApiConstruct {
-    this.createMethodIntegration('HEAD', path, handlerCode, options);
-    return this;
+  put(path: string, handlerCode: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('PUT', path, handlerCode, options);
+  }
+
+  patch(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('PATCH', path, handlerCode, options);
+  }
+
+  delete(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('DELETE', path, handlerCode, options);
+  }
+
+  options(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('OPTIONS', path, handlerCode, options);
+  }
+
+  head(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
+    return this.handleIntegration('HEAD', path, handlerCode, options);
   }
 
 }
+
+//                 'application/json': `#set($inputRoot = $input.path('$'))
+// {
+//   "TableName": "${params.tableName}",
+//   "Item": {
+//     #foreach($key in $inputRoot.keySet())
+//       "$key": {
+//         "S": "$util.escapeJavaScript($inputRoot.get($key))"
+//       }
+//     #end
+//   }
+// }
+// `
