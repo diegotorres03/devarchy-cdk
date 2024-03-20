@@ -261,29 +261,30 @@ export class RestApiConstruct extends Construct {
           }[]
         }) => {
 
+          const partitionKeyName = table.schema().partitionKey.name
+          const sortKeyName = table.schema().sortKey?.name
+
+          
           const methodMap = {
-            get: {
-              action: 'GetItem',
+            GetItem: {
               requestTemplates: {
                 'application/json': `
-                #set($partitionKey = $input.params('${table.schema().partitionKey.name}'))
-                #set($sortKey = $input.params('${table.schema().sortKey?.name}'))
-
+                #set($partitionKey = $input.params('${partitionKeyName}'))
+                #set($sortKey = $input.params('${sortKeyName}'))
                 {
                   "TableName": "${table.tableName}",
                   "Key": {
-                    "${table.schema().partitionKey.name}": { 
+                    "${partitionKeyName}": { 
                       "S": "$partitionKey"
                     }
-                    ${table.schema().sortKey?.name ? `,
-                    "${table.schema().sortKey?.name}": {
+                    ${sortKeyName ? `,
+                    "${sortKeyName}": {
                       "S": "$sortKey"
                     }`: ''}
                     
                   }
                 }
                 `
-
               },
               integrationResponses: [{
                 statusCode: '200',
@@ -292,11 +293,54 @@ export class RestApiConstruct extends Construct {
                   // #set($response = $util.toJson($inputRoot))
                   'application/json': `$input.body`
                 }
-              }]
-
+              }],
             },
-            post: {
-              action: 'PutItem',
+            Query: {
+              requestTemplates: {
+                'application/json': `
+                  #set($partitionKey = $input.params('${partitionKeyName}'))
+                  {
+                    "TableName": "${table.tableName}",
+                    "KeyConditionExpression": "#partitionKey = :partitionKey",
+                    "ExpressionAttributeNames": {
+                      "#partitionKey":  "${partitionKeyName}" 
+                    },
+                    "ExpressionAttributeValues": {
+                      ":partitionKey": { "S": "$input.params('${partitionKeyName}')" }
+                    }
+                  }
+                  `
+              },
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  // #set($inputRoot = $input.path('$'))
+                  // #set($response = $util.toJson($inputRoot))
+                  'application/json': `$input.body`
+                }
+              }],
+            },
+            Scan: {
+              requestTemplates: {
+                'application/json': `
+                  #set($partitionKey = $input.params('${partitionKeyName}'))
+                  #set($sortKey = $input.params('${sortKeyName}'))
+                  {
+                    "TableName": "${table.tableName}"
+                  }
+                  `
+              },
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  // #set($inputRoot = $input.path('$'))
+                  // #set($response = $util.toJson($inputRoot))
+                  'application/json': `$input.body`
+                }
+              }],
+            },
+
+            PutItem: {
               requestTemplates: {
                 'application/json': `
                 #set($inputRoot = $input.path('$') )
@@ -315,41 +359,20 @@ export class RestApiConstruct extends Construct {
               }]
 
             },
-            put: {
-              action: 'PutItem',
+            DeleteItem: {
               requestTemplates: {
                 'application/json': `
-                #set($inputRoot = $input.path('$') )
-                {
-                  "TableName": "${table.tableName}",
-                  "Item": $input.body
-                }
-              `},
-              integrationResponses: [{
-                statusCode: '200',
-                responseTemplates: {
-                  'application/json': `
-                    #set($inputRoot = $input.path('$'))
-                    $inputRoot`
-                }
-              }]
-
-            },
-            delete: {
-              action: 'DeleteItem',
-              requestTemplates: {
-                'application/json': `
-                #set($partitionKey = $input.params('${table.schema().partitionKey.name}'))
-                #set($sortKey = $input.params('${table.schema().sortKey?.name}'))
+                #set($partitionKey = $input.params('${partitionKeyName}'))
+                #set($sortKey = $input.params('${sortKeyName}'))
 
                 {
                   "TableName": "${table.tableName}",
                   "Key": {
-                    "${table.schema().partitionKey.name}": { 
+                    "${partitionKeyName}": { 
                       "S": "$partitionKey"
                     }
-                    ${table.schema().sortKey?.name ? `,
-                    "${table.schema().sortKey?.name}": {
+                    ${sortKeyName ? `,
+                    "${sortKeyName}": {
                       "S": "$sortKey"
                     }`: ''}
                     
@@ -367,8 +390,7 @@ export class RestApiConstruct extends Construct {
                 }
               }]
             },
-            patch: {
-              action: 'UpdateItem',
+            UpdateItem: {
               requestTemplates: ``,
               integrationResponses: [
                 {}
@@ -384,32 +406,72 @@ export class RestApiConstruct extends Construct {
 
           // docs on velocity utils and stuff https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
 
-          const methodTemplate = methodMap[method.toLowerCase()]
+          let action = ''
+          if (method === 'GET') {
+            if (!path.includes(`{${partitionKeyName}}`) && !path.includes(`{${sortKeyName}}`)) {
+              action = 'Scan'
+            } else if (path.includes(`{${partitionKeyName}}`) && !path.includes(`{${sortKeyName}}`)) {
+              action = 'Query'
+            } else if (path.includes(`{${partitionKeyName}}`) && path.includes(`{${sortKeyName}}`)) {
+              action = 'GetItem'
+            }
+          } else if (method === 'POST') {
+            action = 'PutItem'
+          } else if (method === 'PUT') {
+            action = 'PutItem'
+          }
+          else if (method === 'DELETE') {
+            action = 'DeleteItem'
+          }
+          else if (method === 'PATCH') {
+            action = 'UpdateItem'
+          }
+          else {
+            throw new Error(`I don't know how to handle ${method}`)
+          }
+
+          const requestParameters = {}
+          if(path.includes(`{${partitionKeyName}}`)) {
+            requestParameters[`integration.request.path.${partitionKeyName}`] = `'method.request.path.${partitionKeyName}'`
+          }
+
+          if(path.includes(`{${sortKeyName}}`)) {
+            requestParameters[`integration.request.path.${sortKeyName}`] = `'method.request.path.${sortKeyName}'`
+          }
+
+
           const dynamoIntegration = new ApiGateway.AwsIntegration({
             service: 'dynamodb',
-            action: methodTemplate.action || 'GetItem',
+            action,
             options: {
+              
               credentialsRole: methodRole,
               // credentialsPassthrough: true,
 
+              requestParameters,
+              
+
               integrationResponses: options
                 && options.integrationResponses ||
-                methodTemplate.integrationResponses,
+                methodMap[action].integrationResponses,
 
               requestTemplates: options &&
                 options.requestTemplates ||
-                methodTemplate.requestTemplates,
+                methodMap[action].requestTemplates,
             }
           })
+
+
+
 
           const apiMethod = this.api.root.resourceForPath(path)
             .addMethod(method, dynamoIntegration, {
               methodResponses: [{ statusCode: '200', }],
               authorizer: this.currentAuthorizer || undefined,
-
             })
+          apiMethod.resource.path
 
-          let dynamo = {} as Dynamo.Table;
+
 
 
           if (options && Array.isArray(options.access)) {
@@ -454,7 +516,7 @@ export class RestApiConstruct extends Construct {
 
   post(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions) {
     return this.handleIntegration('POST', path, handlerCode, options);
-    
+
   }
 
   put(path: string, handlerCode: string | Function | Object, options?: FunctionOptions) {
@@ -478,16 +540,3 @@ export class RestApiConstruct extends Construct {
   }
 
 }
-
-//                 'application/json': `#set($inputRoot = $input.path('$'))
-// {
-//   "TableName": "${params.tableName}",
-//   "Item": {
-//     #foreach($key in $inputRoot.keySet())
-//       "$key": {
-//         "S": "$util.escapeJavaScript($inputRoot.get($key))"
-//       }
-//     #end
-//   }
-// }
-// `
