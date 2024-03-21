@@ -2,6 +2,7 @@
 import * as ApiGateway from 'aws-cdk-lib/aws-apigateway';
 import * as Dynamo from 'aws-cdk-lib/aws-dynamodb';
 import * as Lambda from 'aws-cdk-lib/aws-lambda';
+import * as SQS from 'aws-cdk-lib/aws-sqs';
 
 import * as IAM from 'aws-cdk-lib/aws-iam';
 
@@ -250,6 +251,16 @@ export class RestApiConstruct extends Construct {
     options?: FunctionOptions) {
     if (!handlerCode) {
 
+      const addMethod = (integration:ApiGateway.Integration) => {
+        const apiMethod = this.api.root.resourceForPath(path)
+          .addMethod(method, integration, {
+            methodResponses: [{ statusCode: '200', }],
+            authorizer: this.currentAuthorizer || undefined,
+          })
+
+
+      }
+
       return {
         // [ ] how can I give access???
         dynamodb: (table: Dynamo.Table, options?: {
@@ -264,7 +275,7 @@ export class RestApiConstruct extends Construct {
           const partitionKeyName = table.schema().partitionKey.name
           const sortKeyName = table.schema().sortKey?.name
 
-          
+
           const methodMap = {
             GetItem: {
               requestTemplates: {
@@ -431,11 +442,11 @@ export class RestApiConstruct extends Construct {
           }
 
           const requestParameters = {}
-          if(path.includes(`{${partitionKeyName}}`)) {
+          if (path.includes(`{${partitionKeyName}}`)) {
             requestParameters[`integration.request.path.${partitionKeyName}`] = `'method.request.path.${partitionKeyName}'`
           }
 
-          if(path.includes(`{${sortKeyName}}`)) {
+          if (path.includes(`{${sortKeyName}}`)) {
             requestParameters[`integration.request.path.${sortKeyName}`] = `'method.request.path.${sortKeyName}'`
           }
 
@@ -444,12 +455,12 @@ export class RestApiConstruct extends Construct {
             service: 'dynamodb',
             action,
             options: {
-              
+
               credentialsRole: methodRole,
               // credentialsPassthrough: true,
 
               requestParameters,
-              
+
 
               integrationResponses: options
                 && options.integrationResponses ||
@@ -463,13 +474,14 @@ export class RestApiConstruct extends Construct {
 
 
 
+          addMethod(dynamoIntegration)
 
-          const apiMethod = this.api.root.resourceForPath(path)
-            .addMethod(method, dynamoIntegration, {
-              methodResponses: [{ statusCode: '200', }],
-              authorizer: this.currentAuthorizer || undefined,
-            })
-          apiMethod.resource.path
+          // const apiMethod = this.api.root.resourceForPath(path)
+          //   .addMethod(method, dynamoIntegration, {
+          //     methodResponses: [{ statusCode: '200', }],
+          //     authorizer: this.currentAuthorizer || undefined,
+          //   })
+          // apiMethod.resource.path
 
 
 
@@ -479,7 +491,75 @@ export class RestApiConstruct extends Construct {
           }
 
         },
-        // sqs(params) { },
+        sqs: (queue: SQS.Queue, options?: {
+          access?: Function[],
+        }) => {
+
+          const methodRole = new IAM.Role(this, `${method}-${path}-integration-role`, {
+            assumedBy: new IAM.ServicePrincipal('apigateway.amazonaws.com'),
+            
+          })
+
+
+          // create an sqs integration
+          const sqsIntegration = new ApiGateway.AwsIntegration({
+            service: 'sqs',
+            action: 'SendMessage',
+            options: {
+              credentialsRole: methodRole,
+              requestParameters: {
+                'integration.request.header.Content-Type': "'application/x-www-form-urlencoded'"
+                // 'integration.request.querystring.Action': "'SendMessage'",
+              },
+
+              // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html
+              // "DelaySeconds": 10,
+              // "MessageAttributes": { 
+              //    "string" : { 
+              //       "BinaryListValues": [ blob ],
+              //       "BinaryValue": blob,
+              //       "DataType": "string",
+              //       "StringListValues": [ "string" ],
+              //       "StringValue": "string"
+              //    }
+              // },
+              // "MessageSystemAttributes": { 
+              //    "string" : { 
+              //       "BinaryListValues": [ blob ],
+              //       "BinaryValue": blob,
+              //       "DataType": "string",
+              //       "StringListValues": [ "string" ],
+              //       "StringValue": "string"
+              //    }
+              // },
+              requestTemplates: {
+                // "MessageBody": "$input.path('$')",
+                'application/json': `
+                {
+                  "MessageBody": "$input.body",
+                  "QueueUrl": "${queue.queueUrl}"
+               }
+                `
+              },
+              integrationResponses: [{
+                statusCode: '200',
+                responseTemplates: {
+                  'application/json': `
+                    #set($inputRoot = $input.path('$'))
+                    $inputRoot`
+                }
+              }],
+            }
+          })
+
+          addMethod(sqsIntegration)
+
+          if (options && Array.isArray(options.access)) {
+            options.access.forEach(accessFn => accessFn(methodRole))
+          }
+
+
+        },
         // sns(params) { },
         // stepFunctions(params) { },
         // s3(params) { },
