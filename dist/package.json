@@ -1,0 +1,19 @@
+{
+  "name": "devarchy-cdk",
+  "version": "0.0.6",
+  "description": "library of constructs to simplify cloud development usign js/ts",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && cp package.json dist/package.json",
+    "deploy": "echo \"deploying to prod\"",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cdk",
+    "aws",
+    "infrastructure"
+  ],
+  "author": "Diego Torres <diegotorres0303@gmail.com>",
+  "license": "ISC"
+}
