@@ -429,42 +429,30 @@ class RestApiConstruct extends constructs_1.Construct {
                 sqs: (queue, options) => {
                     const methodRole = new IAM.Role(this, `${method}-${path}-integration-role`, {
                         assumedBy: new IAM.ServicePrincipal('apigateway.amazonaws.com'),
+                        managedPolicies: [
+                            IAM.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
+                        ]
                     });
                     // create an sqs integration
                     const sqsIntegration = new ApiGateway.AwsIntegration({
                         service: 'sqs',
                         action: 'SendMessage',
+                        // path: `${Stack.of(this).account}/${queue.queueName}`,
                         options: {
                             credentialsRole: methodRole,
                             requestParameters: {
-                                'integration.request.header.Content-Type': "'application/x-www-form-urlencoded'"
+                                'integration.request.header.Content-Type': "'application/json'"
+                                // 'integration.request.header.Content-Type': "'application/x-www-form-urlencoded'"
                                 // 'integration.request.querystring.Action': "'SendMessage'",
                             },
                             // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html
-                            // "DelaySeconds": 10,
-                            // "MessageAttributes": { 
-                            //    "string" : { 
-                            //       "BinaryListValues": [ blob ],
-                            //       "BinaryValue": blob,
-                            //       "DataType": "string",
-                            //       "StringListValues": [ "string" ],
-                            //       "StringValue": "string"
-                            //    }
-                            // },
-                            // "MessageSystemAttributes": { 
-                            //    "string" : { 
-                            //       "BinaryListValues": [ blob ],
-                            //       "BinaryValue": blob,
-                            //       "DataType": "string",
-                            //       "StringListValues": [ "string" ],
-                            //       "StringValue": "string"
-                            //    }
-                            // },
                             requestTemplates: {
+                                // send request body to sqs message
+                                // 'application/json': `Action=SendMessage&MessageBody=$input.body`
                                 // "MessageBody": "$input.path('$')",
                                 'application/json': `
                 {
-                  "MessageBody": "$input.body",
+                  "MessageBody": "$util.urlEncode($util.escapeJavaScript($input.body).replaceAll("\\'","'"))",
                   "QueueUrl": "${queue.queueUrl}"
                }
                 `
