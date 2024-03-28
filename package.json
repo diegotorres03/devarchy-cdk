@@ -15,5 +15,8 @@
     "infrastructure"
   ],
   "author": "Diego Torres <diegotorres0303@gmail.com>",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@aws-cdk/aws-cognito-identitypool-alpha": "^2.133.0-alpha.0"
+  }
 }
