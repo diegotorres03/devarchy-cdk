@@ -60,7 +60,7 @@ export class AuthConstruct extends Construct {
     domainPrefix,
     redirectUri,
     callbackUrls,
-  }) {
+  }: {domainPrefix: string, redirectUri: string, callbackUrls: string[]}) {
 
     const client = this.userPool.addClient('WebClient', {
       oAuth: {
@@ -75,7 +75,7 @@ export class AuthConstruct extends Construct {
     })
 
     const signInUrl = domain.signInUrl(client, {
-      redirectUri: redirectUri //'https://test.easyarchery.net'
+      redirectUri: redirectUri // 'https://test.easyarchery.net'
     })
 
     new CfnOutput(this, 'SignInUrl', { value: signInUrl })

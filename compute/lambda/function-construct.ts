@@ -35,7 +35,11 @@ export interface FunctionOptions {
   readonly layers?: { name: string, path: string }[]; // Lambda.ILayerVersion[];
 }
 
-export class FunctionConstruct extends Construct {
+export class FunctionConstruct extends Construct implements IAM.IGrantable {
+
+  static layers: { [layerName: string]: Lambda.LayerVersion } = {};
+
+  grantPrincipal: IAM.IPrincipal;
 
   // layers: Map<string, Lambda.LayerVersion> = new Map();
   // layersToUse: Set<Lambda.LayerVersion> = new Set();
@@ -44,7 +48,6 @@ export class FunctionConstruct extends Construct {
     return this.handlerFn.functionArn
   }
 
-  layers: { [layerName: string]: Lambda.LayerVersion } = {};
   layersToUse: Array<Lambda.LayerVersion> = [];
 
   // this definition in only to avoid initialization error
@@ -62,6 +65,8 @@ export class FunctionConstruct extends Construct {
   constructor(scope: Construct, id: string) {
     super(scope, id);
     this.functionName = id;
+
+    this.grantPrincipal = new IAM.ServicePrincipal('lambda.amazonaws.com');
   }
 
   /**
@@ -79,13 +84,13 @@ export class FunctionConstruct extends Construct {
       removalPolicy: RemovalPolicy.DESTROY,
       code: Lambda.Code.fromAsset(path), // './layers/dax'
     });
-    this.layers[name] = layer;
+    FunctionConstruct.layers[name] = layer;
     this.useLayer(name);
     return layer;
   }
 
   useLayer(name: string) {
-    const layer = this.layers[name];
+    const layer = FunctionConstruct.layers[name];
     if (!layer) return warn(`layer ${name} not found!`);
     this.layersToUse.push(layer);
   }
@@ -149,7 +154,8 @@ export class FunctionConstruct extends Construct {
 
     // granting access to external resources
     if (Array.isArray(options.access)) {
-      options.access.forEach(accessFn => accessFn(this.handlerFn))
+      // options.access.forEach(accessFn => accessFn(this.handlerFn))
+      options.access.forEach(accessFn => accessFn(this))
     }
 
     // creating and adding layers

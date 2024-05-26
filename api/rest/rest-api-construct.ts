@@ -29,10 +29,11 @@ export class RestApiConstruct extends Construct {
   private currentAuthorizer?: ApiGateway.RequestAuthorizer; // Lambda.Function
   private currentHandler?: Lambda.Function;
   api: ApiGateway.RestApi;
+  private corsOptions: any
 
 
   constructor(scope: Construct, id: string) {
-    super(scope, id);
+    super(scope, id)
 
 
     this.api = new ApiGateway.RestApi(this, id + '_api', {
@@ -74,9 +75,9 @@ export class RestApiConstruct extends Construct {
       ],
       allowCredentials: true,
     };
-    const corsOptions = options || defaultOptions;
+    this.corsOptions = options || defaultOptions;
 
-    this.api.root.addCorsPreflight(corsOptions);
+    this.api.root.addCorsPreflight(this.corsOptions);
     return this;
   }
 
@@ -190,8 +191,10 @@ export class RestApiConstruct extends Construct {
     // [ ] deal with layers
     const integrationOptions = this.currentAuthorizer ? { authorizer: this.currentAuthorizer } : undefined;
     const integration = new ApiGateway.LambdaIntegration(fn.handlerFn); // {proxy: true}
-    this.api.root.resourceForPath(path)
-      .addMethod(method, integration, integrationOptions);
+    const resource = this.api.root.resourceForPath(path)
+    resource.addMethod(method, integration, integrationOptions);
+    resource.addCorsPreflight(this.corsOptions)
+
 
     this.currentHandler = fn.handlerFn;
   }
@@ -227,23 +230,35 @@ export class RestApiConstruct extends Construct {
 
     const integrationOptions: ApiGateway.MethodOptions = {
       authorizer: this.currentAuthorizer || undefined,
-      methodResponses: [{ statusCode: '200', }]
+      methodResponses: [{
+        statusCode: '200',
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Origin': true,
+        }
+      }]
     }
 
-    this.api.root.resourceForPath(path)
-      .addMethod(method, integration, integrationOptions);
+    const resource = this.api.root.resourceForPath(path)
+    resource.addMethod(method, integration, integrationOptions);
+    resource.addCorsPreflight(this.corsOptions)
+
 
   }
 
   private createHTTPIntegration(method: string, path: string, url: string) {
     const integration = new ApiGateway.HttpIntegration(url)
 
-    this.api.root.resourceForPath(path)
-      .addMethod(method, integration, {
-        methodResponses: [{ statusCode: '200', }],
-        authorizer: this.currentAuthorizer || undefined,
-      });
-
+    const resource = this.api.root.resourceForPath(path)
+    resource.addMethod(method, integration, {
+      methodResponses: [{
+        statusCode: '200',
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Origin': true,
+        }
+      }],
+      authorizer: this.currentAuthorizer || undefined,
+    });
+    resource.addCorsPreflight(this.corsOptions)
   }
 
   private handleIntegration(
@@ -254,11 +269,17 @@ export class RestApiConstruct extends Construct {
     if (!handlerCode) {
 
       const addMethod = (integration: ApiGateway.Integration) => {
-        const apiMethod = this.api.root.resourceForPath(path)
-          .addMethod(method, integration, {
-            methodResponses: [{ statusCode: '200', }],
-            authorizer: this.currentAuthorizer || undefined,
-          })
+        const resource = this.api.root.resourceForPath(path)
+        resource.addMethod(method, integration, {
+          methodResponses: [{
+            statusCode: '200',
+            responseParameters: {
+              'method.response.header.Access-Control-Allow-Origin': true,
+            }
+          }],
+          authorizer: this.currentAuthorizer || undefined,
+        })
+        resource.addCorsPreflight(this.corsOptions)
 
 
       }
@@ -445,10 +466,12 @@ export class RestApiConstruct extends Construct {
 
           const requestParameters = {}
           if (path.includes(`{${partitionKeyName}}`)) {
+            // @ts-ignore
             requestParameters[`integration.request.path.${partitionKeyName}`] = `'method.request.path.${partitionKeyName}'`
           }
 
           if (path.includes(`{${sortKeyName}}`)) {
+            // @ts-ignore
             requestParameters[`integration.request.path.${sortKeyName}`] = `'method.request.path.${sortKeyName}'`
           }
 
@@ -463,13 +486,17 @@ export class RestApiConstruct extends Construct {
 
               requestParameters,
 
+              // credentialsPassthrough: true,
+
 
               integrationResponses: options
                 && options.integrationResponses ||
+                // @ts-ignore
                 methodMap[action].integrationResponses,
 
               requestTemplates: options &&
                 options.requestTemplates ||
+                // @ts-ignore
                 methodMap[action].requestTemplates,
             }
           })
@@ -519,7 +546,7 @@ export class RestApiConstruct extends Construct {
               },
 
               // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html
-              
+
               requestTemplates: {
                 // send request body to sqs message
                 // 'application/json': `Action=SendMessage&MessageBody=$input.body`
@@ -556,7 +583,11 @@ export class RestApiConstruct extends Construct {
         // s3(params) { },
         // mock(params) { },
         // http(params) { },
-        // fn(params) { },
+        fn(handlerFn: Lambda.Function) {
+          // const integrationOptions = this.currentAuthorizer ? { authorizer: this.currentAuthorizer } : undefined;
+          const lambdaIntegration = new ApiGateway.LambdaIntegration(handlerFn)
+          addMethod(lambdaIntegration)
+        },
 
 
       }
