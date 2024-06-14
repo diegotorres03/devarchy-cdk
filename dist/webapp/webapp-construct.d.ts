@@ -8,6 +8,7 @@ export declare class WebAppConstruct extends Construct {
     webappBucket: S3.Bucket;
     constructor(scope: Construct, id: string, props?: {
         domainName: string;
+        certArn: string;
     });
     /**
        * Use this metod to upload application artifacts

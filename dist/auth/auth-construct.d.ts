@@ -4,8 +4,8 @@ export declare class AuthConstruct extends Construct {
     userPool: Cognito.UserPool;
     constructor(scope: Construct, id: string, props?: any);
     addClient({ domainPrefix, redirectUri, callbackUrls, }: {
-        domainPrefix: any;
-        redirectUri: any;
-        callbackUrls: any;
+        domainPrefix: string;
+        redirectUri: string;
+        callbackUrls: string[];
     }): void;
 }

@@ -59,7 +59,7 @@ class AuthConstruct extends constructs_1.Construct {
             }
         });
         const signInUrl = domain.signInUrl(client, {
-            redirectUri: redirectUri //'https://test.easyarchery.net'
+            redirectUri: redirectUri // 'https://test.easyarchery.net'
         });
         new aws_cdk_lib_1.CfnOutput(this, 'SignInUrl', { value: signInUrl });
     }

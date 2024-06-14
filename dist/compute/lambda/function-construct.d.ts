@@ -15,11 +15,12 @@ export interface FunctionOptions {
         path: string;
     }[];
 }
-export declare class FunctionConstruct extends Construct {
-    get arn(): string;
-    layers: {
+export declare class FunctionConstruct extends Construct implements IAM.IGrantable {
+    static layers: {
         [layerName: string]: Lambda.LayerVersion;
     };
+    grantPrincipal: IAM.IPrincipal;
+    get arn(): string;
     layersToUse: Array<Lambda.LayerVersion>;
     handlerFn: Lambda.Function;
     private functionName;

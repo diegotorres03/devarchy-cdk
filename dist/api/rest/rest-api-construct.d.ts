@@ -1,5 +1,6 @@
 import * as ApiGateway from 'aws-cdk-lib/aws-apigateway';
 import * as Dynamo from 'aws-cdk-lib/aws-dynamodb';
+import * as Lambda from 'aws-cdk-lib/aws-lambda';
 import * as SQS from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 import { FunctionOptions } from '../../compute';
@@ -15,6 +16,7 @@ export declare class RestApiConstruct extends Construct {
     private currentAuthorizer?;
     private currentHandler?;
     api: ApiGateway.RestApi;
+    private corsOptions;
     constructor(scope: Construct, id: string);
     /**
      * enable cors for this API
@@ -114,6 +116,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     post(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -131,6 +134,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     put(path: string, handlerCode: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -148,6 +152,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     patch(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -165,6 +170,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     delete(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -182,6 +188,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     options(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -199,6 +206,7 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
     head(path: string, handlerCode?: string | Function | Object, options?: FunctionOptions): {
         dynamodb: (table: Dynamo.Table, options?: {
@@ -216,5 +224,6 @@ export declare class RestApiConstruct extends Construct {
         sqs: (queue: SQS.Queue, options?: {
             access?: Function[] | undefined;
         } | undefined) => void;
+        fn(handlerFn: Lambda.Function): void;
     } | undefined;
 }

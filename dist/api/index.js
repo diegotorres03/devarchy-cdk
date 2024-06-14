@@ -16,3 +16,4 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./graphql"), exports);
 __exportStar(require("./rest"), exports);
+__exportStar(require("./websockets"), exports);

@@ -34,22 +34,25 @@ class WebAppConstruct extends constructs_1.Construct {
             zoneName: domainName
         });
         // importing existing cert
-        const cert = aws_cdk_lib_1.aws_certificatemanager.Certificate.fromCertificateArn(this, 'easyarchery_cert', 'arn:aws:acm:us-east-1:177624785149:certificate/ab0805f0-ccaa-4813-9e6b-6668c332bab3');
+        const cert = (props === null || props === void 0 ? void 0 : props.certArn) && aws_cdk_lib_1.aws_certificatemanager.Certificate.fromCertificateArn(this, domainName + '_cert', props === null || props === void 0 ? void 0 : props.certArn);
         // [ ] 1.2.1: create CloudFront distribution [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-cloudfront-readme.html)
         const originAccessIdentity = new aws_cdk_lib_1.aws_cloudfront.OriginAccessIdentity(this, 'OriginAccessIdentity');
         // allow clowdfront to read s3 webpp files
         this.webappBucket.grantRead(originAccessIdentity);
         this.defaultOrigin = new aws_cdk_lib_1.aws_cloudfront_origins.S3Origin(this.webappBucket, { originAccessIdentity });
-        this.cdnDistribution = new aws_cdk_lib_1.aws_cloudfront.Distribution(this, 'WebappDistribution', {
+        const distributionParams = {
             defaultRootObject: 'index.html',
             priceClass: aws_cdk_lib_1.aws_cloudfront.PriceClass.PRICE_CLASS_100,
             defaultBehavior: {
                 origin: this.defaultOrigin,
                 viewerProtocolPolicy: aws_cdk_lib_1.aws_cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
             },
-            certificate: cert,
-            domainNames: [domainName],
-        });
+        };
+        if (cert && domainName) {
+            distributionParams['certificate'] = cert,
+                distributionParams['domainNames'] = [domainName];
+        }
+        this.cdnDistribution = new aws_cdk_lib_1.aws_cloudfront.Distribution(this, 'WebappDistribution', distributionParams);
         const recordSet = new aws_cdk_lib_1.aws_route53.RecordSet(this, domainName + '_recordSet', {
             zone: hostedZone,
             recordType: aws_cdk_lib_1.aws_route53.RecordType.A,

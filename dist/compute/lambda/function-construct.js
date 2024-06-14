@@ -36,9 +36,9 @@ class FunctionConstruct extends constructs_1.Construct {
     }
     constructor(scope, id) {
         super(scope, id);
-        this.layers = {};
         this.layersToUse = [];
         this.functionName = id;
+        this.grantPrincipal = new IAM.ServicePrincipal('lambda.amazonaws.com');
     }
     /**
      * create a layer from local file, s3 url or existing layer construct
@@ -55,12 +55,12 @@ class FunctionConstruct extends constructs_1.Construct {
             removalPolicy: aws_cdk_lib_1.RemovalPolicy.DESTROY,
             code: aws_cdk_lib_1.aws_lambda.Code.fromAsset(path), // './layers/dax'
         });
-        this.layers[name] = layer;
+        FunctionConstruct.layers[name] = layer;
         this.useLayer(name);
         return layer;
     }
     useLayer(name) {
-        const layer = this.layers[name];
+        const layer = FunctionConstruct.layers[name];
         if (!layer)
             return warn(`layer ${name} not found!`);
         this.layersToUse.push(layer);
@@ -116,7 +116,8 @@ class FunctionConstruct extends constructs_1.Construct {
         this.handlerFn = new aws_cdk_lib_1.aws_lambda.Function(this, name + '-handler', lambdaParams);
         // granting access to external resources
         if (Array.isArray(options.access)) {
-            options.access.forEach(accessFn => accessFn(this.handlerFn));
+            // options.access.forEach(accessFn => accessFn(this.handlerFn))
+            options.access.forEach(accessFn => accessFn(this));
         }
         // creating and adding layers
         if (options.layers) {
@@ -168,6 +169,7 @@ class FunctionConstruct extends constructs_1.Construct {
     }
 }
 exports.FunctionConstruct = FunctionConstruct;
+FunctionConstruct.layers = {};
 function getCode(source) {
     if (source.includes('s3://')) {
         // const bucket = ''
