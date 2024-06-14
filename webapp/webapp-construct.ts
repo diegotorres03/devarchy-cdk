@@ -31,7 +31,7 @@ export class WebAppConstruct extends Construct {
   private pathPattern: string = '';
 
   webappBucket: S3.Bucket;
-  constructor(scope: Construct, id: string, props?: { domainName: string }) {
+  constructor(scope: Construct, id: string, props?: { domainName: string, certArn: string }) {
     super(scope, id);
 
     // [ ] 1.1.1: create S3 Bucket as web hosting to store webapp [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-s3-readme.html)
@@ -59,15 +59,15 @@ export class WebAppConstruct extends Construct {
     // [ ] 1.3.1: create Route 53 record set [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-route53-readme.html)
     const domainName = props?.domainName || `${Date.now()}.diegotrs.com`
 
-    const hostedZone = new Route53.HostedZone(this, 'hoztedZone', { 
-      zoneName: domainName 
+    const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
+      zoneName: domainName
     })
 
-  
+
 
 
     // importing existing cert
-    const cert = ACM.Certificate.fromCertificateArn(this, 'easyarchery_cert','arn:aws:acm:us-east-1:177624785149:certificate/ab0805f0-ccaa-4813-9e6b-6668c332bab3')
+    const cert = props?.certArn && ACM.Certificate.fromCertificateArn(this, domainName + '_cert', props?.certArn)
 
 
 
@@ -80,21 +80,25 @@ export class WebAppConstruct extends Construct {
 
     this.defaultOrigin = new CloudFrontOrigins.S3Origin(this.webappBucket, { originAccessIdentity });
 
-    this.cdnDistribution = new CloudFront.Distribution(this, 'WebappDistribution', {
+
+    const distributionParams = {
       defaultRootObject: 'index.html',
       priceClass: CloudFront.PriceClass.PRICE_CLASS_100,
 
       defaultBehavior: {
         origin: this.defaultOrigin,
         viewerProtocolPolicy: CloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      
+
       },
 
 
-      certificate: cert,
-      domainNames: [domainName],
+    }
+    if(cert && domainName) {
+      distributionParams['certificate'] = cert,
+      distributionParams['domainNames'] = [domainName]
+    }
 
-    });
+    this.cdnDistribution = new CloudFront.Distribution(this, 'WebappDistribution', distributionParams);
 
     const recordSet = new Route53.RecordSet(this, domainName + '_recordSet', {
       zone: hostedZone,

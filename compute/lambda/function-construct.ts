@@ -147,6 +147,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       handler: 'index.handler',
       vpc,
       environment: { ...options.env },
+      
     } as Lambda.FunctionProps;
 
     this.handlerFn = new Lambda.Function(this, name + '-handler', lambdaParams);
