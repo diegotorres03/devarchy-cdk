@@ -57,7 +57,7 @@ export class WebAppConstruct extends Construct {
 
 
     // [ ] 1.3.1: create Route 53 record set [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-route53-readme.html)
-    const domainName = props?.domainName || `${Date.now()}.diegotrs.com`
+    const domainName = props?.domainName || `sample-domain.diegotrs.com`
 
     const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
       zoneName: domainName
