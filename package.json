@@ -1,6 +1,6 @@
 {
   "name": "devarchy-cdk",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "library of constructs to simplify cloud development usign js/ts",
   "main": "index.js",
   "scripts": {
