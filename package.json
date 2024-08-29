@@ -2,7 +2,8 @@
   "name": "devarchy-cdk",
   "version": "0.0.12",
   "description": "library of constructs to simplify cloud development usign js/ts",
-  "main": "index.js",
+  "types": "dist/index.d.ts",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc && cp package.json dist/package.json",
     "deploy": "echo \"deploying to prod\"",
