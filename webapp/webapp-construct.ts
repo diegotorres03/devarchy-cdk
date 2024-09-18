@@ -59,7 +59,7 @@ export class WebAppConstruct extends Construct {
     const domainName = props?.domainName || `sample-domain.diegotrs.com`
 
     // const hostedZone = Route53.HostedZone.fromHostedZoneId(this, 'hostedZone', props?.hostedZoneId || '')
-  
+
     // const hostedZone = props?.hostedZoneId ? Route53.HostedZone.fromHostedZoneId(this, 'hostedZone', props.hostedZoneId) : new Route53.HostedZone(this, 'hoztedZone', {
     //   zoneName: domainName
     // })  //null
@@ -103,6 +103,15 @@ export class WebAppConstruct extends Construct {
     this.cdnDistribution = new CloudFront.Distribution(this, 'WebappDistribution', distributionParams);
 
     // this add the "A" record on the route 53 hosted zone, this is what connect route 53 to cloudfront
+
+    let hostedZoneId = props?.hostedZoneId
+    if (!hostedZoneId) {
+      const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
+        zoneName: domainName,
+      })
+      hostedZoneId = hostedZone.hostedZoneId
+    }
+
     new ARecord(this, 'domainNameRecord', {
       zone: Route53.HostedZone.fromHostedZoneAttributes(this, 'hostedZone', {
         hostedZoneId: props?.hostedZoneId || '',
