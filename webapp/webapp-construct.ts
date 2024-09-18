@@ -17,6 +17,7 @@ import { Construct } from 'constructs'
 
 
 import { FunctionConstruct } from '../compute';
+import { ARecord } from 'aws-cdk-lib/aws-route53';
 
 const { ORIGIN_REQUEST, ORIGIN_RESPONSE, VIEWER_REQUEST, VIEWER_RESPONSE } = CloudFront.LambdaEdgeEventType;
 
@@ -31,7 +32,8 @@ export class WebAppConstruct extends Construct {
   private pathPattern: string = '';
 
   webappBucket: S3.Bucket;
-  constructor(scope: Construct, id: string, props?: { domainName: string, certArn: string }) {
+  static deployCount = 0
+  constructor(scope: Construct, id: string, props?: { domainName?: string, hostedZoneId?: string, certArn?: string }) {
     super(scope, id);
 
     // [ ] 1.1.1: create S3 Bucket as web hosting to store webapp [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-s3-readme.html)
@@ -53,25 +55,25 @@ export class WebAppConstruct extends Construct {
     });
     // exportName: 'webappBucketName'
 
-
-
-
-    // [ ] 1.3.1: create Route 53 record set [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-route53-readme.html)
+    // [x] 1.3.1: create Route 53 record set [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-route53-readme.html)
     const domainName = props?.domainName || `sample-domain.diegotrs.com`
 
-    const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
-      zoneName: domainName
-    })
+    // const hostedZone = Route53.HostedZone.fromHostedZoneId(this, 'hostedZone', props?.hostedZoneId || '')
+  
+    // const hostedZone = props?.hostedZoneId ? Route53.HostedZone.fromHostedZoneId(this, 'hostedZone', props.hostedZoneId) : new Route53.HostedZone(this, 'hoztedZone', {
+    //   zoneName: domainName
+    // })  //null
 
-
-
+    // const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
+    //   zoneName: domainName,
+    // })  
 
     // importing existing cert
     const cert = props?.certArn && ACM.Certificate.fromCertificateArn(this, domainName + '_cert', props?.certArn)
 
 
 
-    // [ ] 1.2.1: create CloudFront distribution [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-cloudfront-readme.html)
+    // [x] 1.2.1: create CloudFront distribution [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-cloudfront-readme.html)
     const originAccessIdentity = new CloudFront.OriginAccessIdentity(this, 'OriginAccessIdentity');
 
 
@@ -93,20 +95,31 @@ export class WebAppConstruct extends Construct {
 
 
     }
-    if(cert && domainName) {
+    if (cert && domainName) {
       distributionParams['certificate'] = cert,
-      distributionParams['domainNames'] = [domainName]
+        distributionParams['domainNames'] = [domainName]
     }
 
     this.cdnDistribution = new CloudFront.Distribution(this, 'WebappDistribution', distributionParams);
 
-    const recordSet = new Route53.RecordSet(this, domainName + '_recordSet', {
-      zone: hostedZone,
-      recordType: Route53.RecordType.A,
+    // this add the "A" record on the route 53 hosted zone, this is what connect route 53 to cloudfront
+    new ARecord(this, 'domainNameRecord', {
+      zone: Route53.HostedZone.fromHostedZoneAttributes(this, 'hostedZone', {
+        hostedZoneId: props?.hostedZoneId || '',
+        zoneName: domainName,
+      }),
       target: Route53.RecordTarget.fromAlias(new Route53Targets.CloudFrontTarget(this.cdnDistribution)),
-      recordName: domainName,
-      comment: 'CDN for ' + domainName,
     })
+
+    // const recordSet = new Route53.RecordSet(this, domainName + '_recordSet', {
+    //   zone: hostedZone,
+    //   recordType: Route53.RecordType.A,
+    //   target: Route53.RecordTarget.fromAlias(new Route53Targets.CloudFrontTarget(this.cdnDistribution)),
+    //   recordName: domainName,
+    //   comment: 'CDN for ' + domainName,
+    // })
+
+
 
 
 
@@ -158,11 +171,12 @@ export class WebAppConstruct extends Construct {
      * @memberof WebAppConstruct
      */
   addAssets(path: string, destinationPath?: string): WebAppConstruct {
-    new S3Deployment.BucketDeployment(this, 'deployStaticWebapp', {
+    new S3Deployment.BucketDeployment(this, 'deployStaticWebapp_' + WebAppConstruct.deployCount, {
       sources: [S3Deployment.Source.asset(path)],
       destinationBucket: this.webappBucket,
       destinationKeyPrefix: destinationPath ? destinationPath : undefined,
     });
+    WebAppConstruct.deployCount++
     return this;
   }
 

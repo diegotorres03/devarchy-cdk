@@ -33,9 +33,13 @@ export class TinyVectorDBConstruct extends Construct {
 
     // [x] create function layer and handler
     this.db = new FunctionConstruct(this, `${id}_handler`)
-    this.db.createLayer('TinyVectorDB_lib', './lib/tiny-vector-db-core')
-    this.db.code('./lib/tiny-vector-db/functions/main')
 
+    // HACK: this pats are assuming this is installed using NPM
+    // [ ] find a way to use a relative path instead
+    this.db.createLayer('TinyVectorDB_lib', './node_modules/devarchy-cdk/database/tiny-vector/layers/tiny-vector-db-core')
+    this.db.code('./node_modules/devarchy-cdk/database/tiny-vector/functions/main')
+    // this.db.code('./lib/tiny-vector-db/functions/main')
+    
     // [x] add permision to Bedrock
 
     this.db.handlerFn.addToRolePolicy(
