@@ -18,6 +18,7 @@ import { Construct } from 'constructs'
 
 import { FunctionConstruct } from '../compute';
 import { ARecord } from 'aws-cdk-lib/aws-route53';
+import { HttpOrigin, OriginGroup, S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 
 const { ORIGIN_REQUEST, ORIGIN_RESPONSE, VIEWER_REQUEST, VIEWER_RESPONSE } = CloudFront.LambdaEdgeEventType;
 
@@ -56,7 +57,7 @@ export class WebAppConstruct extends Construct {
     // exportName: 'webappBucketName'
 
     // [x] 1.3.1: create Route 53 record set [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-route53-readme.html)
-    const domainName = props?.domainName || `sample-domain.diegotrs.com`
+    const domainName = props?.domainName || `no-domain.dev-archy.com`
 
     // const hostedZone = Route53.HostedZone.fromHostedZoneId(this, 'hostedZone', props?.hostedZoneId || '')
 
@@ -74,13 +75,13 @@ export class WebAppConstruct extends Construct {
 
 
     // [x] 1.2.1: create CloudFront distribution [docs](https://docs.aws.amazon.com/cdk/api/v1/docs/aws-cloudfront-readme.html)
-    const originAccessIdentity = new CloudFront.OriginAccessIdentity(this, 'OriginAccessIdentity');
+    // const originAccessIdentity = new CloudFront.OriginAccessIdentity(this, 'OriginAccessIdentity');
 
 
     // allow clowdfront to read s3 webpp files
-    this.webappBucket.grantRead(originAccessIdentity);
+    // this.webappBucket.grantRead(originAccessIdentity);
 
-    this.defaultOrigin = new CloudFrontOrigins.S3Origin(this.webappBucket, { originAccessIdentity });
+    // this.defaultOrigin = new CloudFrontOrigins.S3Origin(this.webappBucket, { originAccessIdentity });
 
 
     const distributionParams = {
@@ -88,11 +89,15 @@ export class WebAppConstruct extends Construct {
       priceClass: CloudFront.PriceClass.PRICE_CLASS_100,
 
       defaultBehavior: {
-        origin: this.defaultOrigin,
+        // origin: this.defaultOrigin,
+        origin: new OriginGroup({
+          primaryOrigin: S3BucketOrigin.withOriginAccessControl(this.webappBucket),
+          fallbackOrigin: new HttpOrigin('easyarchery.net'),
+          fallbackStatusCodes: [404],
+        }),
         viewerProtocolPolicy: CloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
 
       },
-
 
     }
     if (cert && domainName) {
@@ -106,7 +111,7 @@ export class WebAppConstruct extends Construct {
 
     let hostedZoneId = props?.hostedZoneId
     if (!hostedZoneId) {
-      const hostedZone = new Route53.HostedZone(this, 'hoztedZone', {
+      const hostedZone = new Route53.HostedZone(this, 'hoztedZone_' + domainName, {
         zoneName: domainName,
       })
       hostedZoneId = hostedZone.hostedZoneId
@@ -114,7 +119,7 @@ export class WebAppConstruct extends Construct {
 
     new ARecord(this, 'domainNameRecord', {
       zone: Route53.HostedZone.fromHostedZoneAttributes(this, 'hostedZone', {
-        hostedZoneId: props?.hostedZoneId || '',
+        hostedZoneId: hostedZoneId,
         zoneName: domainName,
       }),
       target: Route53.RecordTarget.fromAlias(new Route53Targets.CloudFrontTarget(this.cdnDistribution)),
