@@ -20,6 +20,7 @@
   "dependencies": {
     "@aws-cdk/aws-cognito-identitypool-alpha": "^2.133.0-alpha.0",
     "@aws-sdk/client-bedrock-runtime": "^3.654.0",
+    "@aws-sdk/client-s3": "^3.654.0",
     "@lancedb/lancedb": "^0.10.0",
     "@langchain/textsplitters": "^0.1.0",
     "aws-cdk-lib": "^2.159.0",

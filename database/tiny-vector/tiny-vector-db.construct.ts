@@ -35,7 +35,9 @@ let client = new BedrockRuntimeClient({
   region: "us-west-2",
 });
 
-const region = process.env.AWS_REGION || "us-east-2"
+const region = process.env.AWS_REGION || 'us-east-1' //"us-east-2"
+
+
 
 export class TinyVectorDBConstruct extends Construct {
 
@@ -53,10 +55,14 @@ export class TinyVectorDBConstruct extends Construct {
 
   indexFolderFn: FunctionConstruct
 
-
-
-
-
+  titanPolicyStatement = new PolicyStatement({
+    actions: ["bedrock:InvokeModel"],
+    resources: [
+      `arn:aws:bedrock:${region}::foundation-model/amazon.titan-*`,
+    ],
+    effect: Effect.ALLOW,
+  })
+  
 
   /**
    * Arn for lambda handler
@@ -84,9 +90,7 @@ export class TinyVectorDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props?: any) {
     super(scope, id)
 
-
     this.bucket = new Bucket(this, 'knowledgeBaseBucket')
-
 
     // [x] create function layer and handler
     this.db = new FunctionConstruct(this, `${id}_handler`)
@@ -103,16 +107,7 @@ export class TinyVectorDBConstruct extends Construct {
 
     // [x] add permision to Bedrock
 
-
-    const titanPolicyStatement = new PolicyStatement({
-      actions: ["bedrock:InvokeModel"],
-      resources: [
-        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-*`,
-      ],
-      effect: Effect.ALLOW,
-    })
-
-    this.db.handlerFn.addToRolePolicy(titanPolicyStatement)
+    this.db.handlerFn.addToRolePolicy(this.titanPolicyStatement)
 
 
     // SEARCH FN
@@ -127,7 +122,7 @@ export class TinyVectorDBConstruct extends Construct {
 
       return { success: true }
     }`)
-    this.searchFn.handlerFn.addToRolePolicy(titanPolicyStatement)
+    this.searchFn.handlerFn.addToRolePolicy(this.titanPolicyStatement)
 
     // INDEX_FOLDER
     this.indexFolderFn = new FunctionConstruct(this, 'indexFolderFn')
@@ -142,7 +137,7 @@ export class TinyVectorDBConstruct extends Construct {
       return { success: true }  
     }`)
 
-    this.indexFolderFn.handlerFn.addToRolePolicy(titanPolicyStatement)
+    this.indexFolderFn.handlerFn.addToRolePolicy(this.titanPolicyStatement)
 
     this.invokeArn = this.db.handlerFn.functionArn
     new CfnOutput(this, `${id}_Arn`, {
@@ -152,6 +147,8 @@ export class TinyVectorDBConstruct extends Construct {
     })
 
   }
+
+
 
   /**
    * Index a folder in place and create the database folder on that location

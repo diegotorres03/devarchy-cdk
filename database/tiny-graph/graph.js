@@ -1,3 +1,32 @@
+const {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} = require("@aws-sdk/client-s3");
+
+const s3 = new S3Client();
+
+const Bucket = "";
+
+const { readFile, writeFile } = require("fs/promises");
+
+async function saveS3File(path, content) {
+  const command = new PutObjectCommand({
+    Bucket,
+    Key: path,
+    Body: content,
+  });
+  return s3.send(command);
+}
+
+async function getFile(path) {
+  const command = new GetObjectCommand({
+    Bucket,
+    Key: path,
+  });
+  return s3.send(command);
+}
+
 const sampleGraph = {
   nodes: [
     {
@@ -29,7 +58,46 @@ const sampleGraph = {
 class Graph {
   #nodes = [];
 
-  constructor() {}
+  /**
+   * Load a graph from a given path, either a local path or an s3 path
+   *
+   * @static
+   * @param {string} path
+   * @memberof GNode
+   */
+  static load(path) {
+    // [ ] load from local file
+
+    // [ ] load from s3 folder
+    if (path.startsWith("s3://")) {
+      const bucket = path.replace("s3://", "").split(/[\/]/g).shift();
+
+      console.log("bucket", bucket);
+    }
+  }
+
+  constructor(s3Client) {}
+
+  /**
+   * Save the graph in a given path, this can be local file or an s3 bucket
+   *
+   * @param {string} path
+   * @memberof GNode
+   */
+  async save(path) {
+    // [ ] save to local file
+    if (path.startsWith("./") || path.startsWith("../")) {
+      console.log('this.toJson()', JSON.stringify(this.toJson(), null, 2))
+      // const res = await writeFile(path, JSON.stringify(this.toJson()));
+      // console.log("save file res", res);
+    }
+
+    // [ ] save to s3 folder
+    if (path.startsWith("s3://")) {
+      // const bucket = path.replace("s3://", "").split(/[\/]/g).shift();
+      // console.log("bucket", bucket);
+    }
+  }
 
   /**
    * register a node in a graph
@@ -76,38 +144,39 @@ class Graph {
     const queue = [[start]];
     const visited = new Set();
     const allPaths = [];
-  
+
     while (queue.length > 0) {
       const path = queue.shift();
-      if(!path) throw new Error('no path')
+      if (!path) throw new Error("no path");
       const node = path[path.length - 1];
-  
+
       if (node === destination) {
         allPaths.push(path); // Found a path to the destination
         continue; // Continue searching for other paths
       }
-  
+
       if (!visited.has(node.key)) {
         visited.add(node.key);
-  
+
         // Explore outgoing edges
         for (const { node: nextNode, rel } of node.out) {
-          if (!path.includes(nextNode)) { // Avoid cycles in the current path
+          if (!path.includes(nextNode)) {
+            // Avoid cycles in the current path
             queue.push([...path, nextNode]);
           }
         }
-  
+
         // Explore bidirectional edges
         for (const { node: nextNode, rel } of node.bidirectional) {
-          if (!path.includes(nextNode)) { // Avoid cycles in the current path
+          if (!path.includes(nextNode)) {
+            // Avoid cycles in the current path
             queue.push([...path, nextNode]);
           }
         }
       }
     }
-  
+
     return allPaths.length > 0 ? allPaths : null; // Return all paths or null if none found
-  
   }
 
   /**
@@ -120,107 +189,160 @@ class Graph {
    */
   deepSearch(start, destination, options) {
     const visited = new Set();
-  const allPaths = [];
+    const allPaths = [];
 
-  function dfs(currentNode, path) {
-    visited.add(currentNode.key);
-    path.push(currentNode);
+    function dfs(currentNode, path) {
+      visited.add(currentNode.key);
+      path.push(currentNode);
 
-    if (currentNode === destination) {
-      allPaths.push([...path]); // Found a path, add a copy to allPaths
-    } else {
-      // Explore outgoing edges
-      for (const { node: nextNode } of currentNode.out) {
-        if (!visited.has(nextNode.key)) {
-          dfs(nextNode, path);
+      if (currentNode === destination) {
+        allPaths.push([...path]); // Found a path, add a copy to allPaths
+      } else {
+        // Explore outgoing edges
+        for (const { node: nextNode } of currentNode.out) {
+          if (!visited.has(nextNode.key)) {
+            dfs(nextNode, path);
+          }
+        }
+
+        // Explore bidirectional edges
+        for (const { node: nextNode } of currentNode.bidirectional) {
+          if (!visited.has(nextNode.key)) {
+            dfs(nextNode, path);
+          }
         }
       }
 
-      // Explore bidirectional edges
-      for (const { node: nextNode } of currentNode.bidirectional) {
-        if (!visited.has(nextNode.key)) {
-          dfs(nextNode, path);
-        }
-      }
+      // Backtrack
+      visited.delete(currentNode.key);
+      path.pop();
     }
 
-    // Backtrack
-    visited.delete(currentNode.key);
-    path.pop();
-  }
+    dfs(start, []);
 
-  dfs(start, []);
-
-  return allPaths.length > 0 ? allPaths : null; // Return all paths or null if none found
-
+    return allPaths.length > 0 ? allPaths : null; // Return all paths or null if none found
   }
 
   // [ ] implement a way to match patterns
   /**
    * receive a match query string similar to cypher match query
-   * 
-   * @example 
+   *
+   * @example
    * graph.match('()-[papa]->()') // returns (diego)-[papa]->(megan), (horacio)-[papa]->(diego), (diego)-[papa]->(maxi)
    *
    * @param {string} matchQuery
    * @memberof Graph
    */
-match(matchQuery) {
-  // Remove whitespace and split the query into parts
-  const parts = matchQuery.replace(/\s/g, '').match(/(\([^\)]*\))|(\[[^\]]*\])|(-+>?)/g);
-  console.log('PARTS:', parts)
-  
+  match(matchQuery) {
+    // Remove whitespace and split the query into parts
+    const parts = matchQuery
+      .replace(/\s/g, "")
+      .match(/(\([^\)]*\))|(\[[^\]]*\])|(-+>?)/g);
+    console.log("PARTS:", parts);
 
-  // [ ] make this function work with variable amount of relationships, not only ()-[]->()
-  // [ ] make the directions work
+    // [ ] make this function work with variable amount of relationships, not only ()-[]->()
+    // [ ] make the directions work
 
-  if (!parts || parts.length < 3) {
-    throw new Error('Invalid match query format');
-  }
+    if (!parts || parts.length < 3) {
+      throw new Error("Invalid match query format");
+    }
 
-  const startNode = parts[0];
-  const endNode = parts[parts.length - 1];
-  const relationship = parts.slice(1, -1).join('');
+    const startNode = parts[0];
+    const endNode = parts[parts.length - 1];
+    const relationship = parts.slice(1, -1).join("");
 
-  const rel = relationship.match(/\[(.*?)\]/)?.[1] || '';
+    const rel = relationship.match(/\[(.*?)\]/)?.[1] || "";
 
-  const results = [];
+    const results = [];
 
-  for (const node of this.#nodes) {
-    // Check outgoing relationships
-    for (const { node: targetNode, rel: edgeRel } of node.out) {
-      if (this.matchesPattern(node, targetNode, edgeRel, startNode, endNode, rel)) {
-        results.push(`(${node.key})-[${edgeRel}]->(${targetNode.key})`);
+    for (const node of this.#nodes) {
+      // Check outgoing relationships
+      for (const { node: targetNode, rel: edgeRel } of node.out) {
+        if (
+          this.matchesPattern(
+            node,
+            targetNode,
+            edgeRel,
+            startNode,
+            endNode,
+            rel
+          )
+        ) {
+          results.push(`(${node.key})-[${edgeRel}]->(${targetNode.key})`);
+        }
+      }
+
+      // Check bidirectional relationships
+      for (const { node: targetNode, rel: edgeRel } of node.bidirectional) {
+        if (
+          this.matchesPattern(
+            node,
+            targetNode,
+            edgeRel,
+            startNode,
+            endNode,
+            rel
+          )
+        ) {
+          results.push(`(${node.key})-[${edgeRel}]-(${targetNode.key})`);
+        }
       }
     }
 
-    // Check bidirectional relationships
-    for (const { node: targetNode, rel: edgeRel } of node.bidirectional) {
-      if (this.matchesPattern(node, targetNode, edgeRel, startNode, endNode, rel)) {
-        results.push(`(${node.key})-[${edgeRel}]-(${targetNode.key})`);
-      }
-    }
+    return results;
   }
 
-  return results;
-}
+  matchesPattern(
+    sourceNode,
+    targetNode,
+    edgeRel,
+    startPattern,
+    endPattern,
+    relPattern
+  ) {
+    const matchesNode = (node, pattern) => {
+      if (pattern === "()") return true;
+      const nodeKey = pattern.slice(1, -1);
+      return nodeKey === "" || node.key === nodeKey;
+    };
 
-matchesPattern(sourceNode, targetNode, edgeRel, startPattern, endPattern, relPattern) {
-  const matchesNode = (node, pattern) => {
-    if (pattern === '()') return true;
-    const nodeKey = pattern.slice(1, -1);
-    return nodeKey === '' || node.key === nodeKey;
-  };
+    return (
+      matchesNode(sourceNode, startPattern) &&
+      matchesNode(targetNode, endPattern) &&
+      (relPattern === "" || edgeRel === relPattern)
+    );
+  }
 
-  return matchesNode(sourceNode, startPattern) &&
-         matchesNode(targetNode, endPattern) &&
-         (relPattern === '' || edgeRel === relPattern);
-}
+  /**
+   * like neo4j, this match a pattern and add the new stuff
+   *
+   * @memberof GNode
+   */
+  merge() {
+    // [ ] implement merge
+  }
 
+  toString() {
+    return this.#nodes.map((node) => node.toString()).join("\n");
+  }
 
+  toJson() {
+    return {
+      key: "",
+      nodes: this.#nodes.map((node) => node.toJson()),
+    };
+  }
 
+  toMermaid() {
+    const direction = "TD";
+    const mermaidCode = `\`\`\`mermaid
+graph ${direction}
+  ${this.#nodes.map((node) => node.toMermaid()).join("  \n")}
+    
+\`\`\``;
 
-  
+    return mermaidCode;
+  }
 }
 
 /**
@@ -233,6 +355,8 @@ class GNode {
   out = [];
   #in = [];
   bidirectional = [];
+
+  static fromJson(json) {}
 
   constructor(key, props = {}) {
     this.key = key;
@@ -261,7 +385,26 @@ class GNode {
       .map(({ node, rel }) => `(${this.key})-[${rel}]->(${node.key})`)
       .join("\n");
   }
+
+  toJson() {
+    return {
+      key: this.key,
+      out: this.out.map((link) => link.key),
+      in: this.#in.map((link) => link.key),
+      bidirectional: this.bidirectional.map((link) => link.key),
+    };
+  }
+
+  toMermaid() {
+    return this.out
+      .map(({ node, rel }) => `${this.key}--${rel}-->${node.key}`)
+      .join("  \n");
+  }
 }
+
+// Graph.load('')
+
+// return
 
 const graph = new Graph();
 
@@ -286,30 +429,37 @@ diego.to(megan, "papa").to(maxi, "papa").to(moni, "esposo");
 horacio.to(diego, "papa");
 
 console.log(graph.toString());
+console.log("----------------------");
+console.log(graph.toJson());
+console.log("----------------------");
+console.log(graph.toMermaid());
+console.log("----------------------");
 
+console.log();
 
 // const paths = graph.wideSearch(horacio, megan);
 const paths = graph.deepSearch(horacio, megan);
 if (paths) {
   console.log(`Found ${paths.length} path(s):`);
   paths.forEach((path, index) => {
-    console.log(`Path ${index + 1}:`, path.map(node => node.key).join(" -> "));
+    console.log(
+      `Path ${index + 1}:`,
+      path.map((node) => node.key).join(" -> ")
+    );
   });
 } else {
   console.log("No paths found");
 }
 
+console.log("----------------------");
 
-console.log('----------------------')
-
-const query = '()-[papa]->()-[papa]-()'
+// const query = '()-[papa]->()-[papa]-()'
 // const query = '()-[papa]->()'
-// const query = '()-[papa]->()'
+const query = "()-[papa]->(diego)";
 const matchResults = graph.match(query);
 console.log(matchResults);
 
-
-
+graph.save("./graph.json");
 
 /*
 COMMENT: this distinction is imporntant BFS and DFS

@@ -27,7 +27,9 @@ const dbName = process.env.DB_NAME || 'cody-db'
 exports.handler = async (event) => {
 
   console.log(JSON.stringify(event, undefined, 2))
+  // @ts-ignore
   if (!db) db = await connect(`/opt/${dbName}`)
+    // @ts-ignore
   if (!table) table = await db.openTable('code')
 
   const searchText = getTextFromEvent(event)
@@ -82,7 +84,8 @@ async function translateEmbeddings(client, inputText) {
   const response = await client.send(command)
     .catch(err => console.log(err))
 
-  const completion = JSON.parse(Buffer.from(response.body, 'base64'))
+     
+  const completion = JSON.parse(Buffer.from(response.body, 'base64').toString())
   const vector = completion.embedding
 
   return {

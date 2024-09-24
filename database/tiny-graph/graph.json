@@ -1,0 +1,70 @@
+{
+  "key": "",
+  "nodes": [
+    {
+      "key": "moni",
+      "out": [
+        null,
+        null,
+        null
+      ],
+      "in": [
+        null,
+        null,
+        null
+      ],
+      "bidirectional": []
+    },
+    {
+      "key": "diego",
+      "out": [
+        null,
+        null,
+        null
+      ],
+      "in": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "bidirectional": []
+    },
+    {
+      "key": "megan",
+      "out": [
+        null,
+        null,
+        null
+      ],
+      "in": [
+        null,
+        null,
+        null
+      ],
+      "bidirectional": []
+    },
+    {
+      "key": "maxi",
+      "out": [
+        null,
+        null,
+        null
+      ],
+      "in": [
+        null,
+        null,
+        null
+      ],
+      "bidirectional": []
+    },
+    {
+      "key": "horacio",
+      "out": [
+        null
+      ],
+      "in": [],
+      "bidirectional": []
+    }
+  ]
+}
