@@ -9,8 +9,10 @@
   "author": "Diego Torres",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.451.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.658.0",
+    "@langchain/community": "^0.3.3",
     "@langchain/textsplitters": "^0.1.0",
+    "pdf-parse": "^1.1.1",
     "tiny-vector": "file:./lib/tiny-vector",
     "vectordb": "^0.10.0"
   }

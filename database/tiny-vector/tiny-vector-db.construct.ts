@@ -1,5 +1,6 @@
 import {
   CfnOutput,
+  Duration,
 } from 'aws-cdk-lib'
 import { Construct } from 'constructs'
 
@@ -54,15 +55,17 @@ export class TinyVectorDBConstruct extends Construct {
   searchFn: FunctionConstruct
 
   indexFolderFn: FunctionConstruct
+  updateLayerFn: FunctionConstruct
 
   titanPolicyStatement = new PolicyStatement({
     actions: ["bedrock:InvokeModel"],
     resources: [
-      `arn:aws:bedrock:${region}::foundation-model/amazon.titan-*`,
+      `arn:aws:bedrock:${region}::foundation-model/*`,
+      // `arn:aws:bedrock:${region}::foundation-model/amazon.titan-*`,
     ],
     effect: Effect.ALLOW,
   })
-  
+
 
   /**
    * Arn for lambda handler
@@ -128,16 +131,42 @@ export class TinyVectorDBConstruct extends Construct {
     this.indexFolderFn = new FunctionConstruct(this, 'indexFolderFn')
     this.indexFolderFn.useLayer(this.layerName)
     this.indexFolderFn.code(`async function handler(event) {
-      const {indexFolder} = require('tinyVectorTools')
+      const { indexS3Folder } = require('tiny-vector')
       console.log('event', JSON.stringify(event, null, 2))
 
-      console.log(indexFolder)
+      const { paths, dbName } = event
+      const promises = paths.map(path => indexS3Folder(path, dbName || 'importdb'))
+      const res = await Promise.all(promises)
 
-
-      return { success: true }  
-    }`)
+      return { success: true } 
+    }`, {
+      env: {
+        TINY_DB_BUCKET: this.bucket.bucketName
+      },
+      timeout: Duration.minutes(10),
+      memorySize: 2 * 1024,
+    })
 
     this.indexFolderFn.handlerFn.addToRolePolicy(this.titanPolicyStatement)
+    this.bucket.grantReadWrite(this.indexFolderFn.handlerFn)
+
+
+    // Update Layer
+    this.updateLayerFn = new FunctionConstruct(this, 'updateLayer')
+    this.updateLayerFn.useLayer(this.layerName)
+    this.updateLayerFn.code(`async function handler(event) {
+      const { updateLayer } = require('/opt/nodejs/lib/tiny-vector')
+      console.log('event', JSON.stringify(event, null, 2))
+      const isRest = typeof event.body === 'string'
+      const body = isRest ? JSON.parse(event.body) : event
+
+      const { layerName, s3Source } = body
+      console.log(updateLayer)
+      await updateLayer()
+
+
+      return { success: true }
+    }`)
 
     this.invokeArn = this.db.handlerFn.functionArn
     new CfnOutput(this, `${id}_Arn`, {

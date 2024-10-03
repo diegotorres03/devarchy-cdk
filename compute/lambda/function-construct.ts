@@ -7,6 +7,8 @@ import {
   Duration,
 } from 'aws-cdk-lib';
 import * as IAM from 'aws-cdk-lib/aws-iam'
+import { Architecture } from 'aws-cdk-lib/aws-lambda';
+import { Bucket } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
 const { warn } = console;
@@ -31,6 +33,7 @@ export interface FunctionOptions {
   readonly timeout?: Duration;
   readonly access?: Function[];
   readonly vpc?: EC2.Vpc | string;
+  readonly memorySize?: Number | undefined
   readonly securityGroupIds?: string[];
   readonly layers?: { name: string, path: string }[]; // Lambda.ILayerVersion[];
 }
@@ -80,6 +83,17 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
    */
   createLayer(name: string, path: string): Lambda.LayerVersion {
     console.info(`creating layer ${name} using ${path}`);
+
+    let code
+    if(path.startsWith('s3://')) {
+      const [bucketName, key] = path.replace('s3://', '').split('/')
+      console.log('bucketName, key', bucketName, key);
+      const bucket = Bucket.fromBucketName(this, name + 'layer', bucketName)
+      
+      code = Lambda.Code.fromBucket(bucket, key)
+    }
+
+
     const layer = new Lambda.LayerVersion(this, name, {
       removalPolicy: RemovalPolicy.DESTROY,
       code: Lambda.Code.fromAsset(path), // './layers/dax'
@@ -141,8 +155,10 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       code: getCode(functionCode),
       timeout: options.timeout || Duration.seconds(30),
       layers: this.layersToUse,
+      memorySize: options.memorySize,
       // code: Lambda.Code.fromAsset(lambdaDef.path),
       allowPublicSubnet: vpc ? true : undefined,
+      // architecture: Architecture.ARM_64,
       securityGroups: sgs,
       handler: 'index.handler',
       vpc,
