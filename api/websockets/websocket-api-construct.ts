@@ -44,4 +44,7 @@ export class WebSocketApiConstruct extends Construct {
 
 
   }
+
+  // authorizer()
+
 }

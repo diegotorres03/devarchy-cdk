@@ -7,7 +7,7 @@ import {
   Duration,
 } from 'aws-cdk-lib';
 import * as IAM from 'aws-cdk-lib/aws-iam'
-import { Architecture } from 'aws-cdk-lib/aws-lambda';
+import { Architecture, IDestination } from 'aws-cdk-lib/aws-lambda';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
@@ -55,6 +55,10 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
 
   // this definition in only to avoid initialization error
   // src/compute/lambda/function-construct.ts:45:3 - error TS2564: Property 'handlerFn' has no initializer and is not definitely assigned in the constructor.
+  
+  
+  // [ ] Inicializar esta lambda asi sea con un hello world pa no romper cosas y bacano q tenga algo por defecto
+
   // @ts-ignore
   handlerFn: Lambda.Function
   //   handlerFn: Lambda.Function = new Lambda.Function(this, 'empty-fn' + Date.now(), {
@@ -62,6 +66,10 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
   //   code: Lambda.Code.fromInline('export.handler = event => {console.log(event); reutrn {success:true}}'),
   //   handler: 'index.handler',
   // });
+
+  onSuccess?: IDestination
+
+  onFailure?: IDestination
 
   private functionName: string;
 
@@ -123,6 +131,14 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     return this.code(functionCode, options)
   }
 
+  then(destination: IDestination) {
+    this.onSuccess = destination
+  }
+  
+  catch(destination: IDestination) {
+    this.onFailure = destination
+  }
+
 
   /**
    * here is where you add or reference the lambda code
@@ -150,7 +166,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     }
 
 
-    const lambdaParams = {
+    const params = {
       runtime: Lambda.Runtime.NODEJS_LATEST,
       code: getCode(functionCode),
       timeout: options.timeout || Duration.seconds(30),
@@ -163,8 +179,17 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       handler: 'index.handler',
       vpc,
       environment: { ...options.env },
-      
-    } as Lambda.FunctionProps;
+    } 
+
+
+    if(this.onSuccess) params['onSuccess'] = this.onSuccess
+    if(this.onFailure) params['onFailure'] = this.onFailure
+
+
+    const lambdaParams = params as Lambda.FunctionProps;
+
+    // onFailure: '',
+    // onSuccess: this.
 
     this.handlerFn = new Lambda.Function(this, name + '-handler', lambdaParams);
 
