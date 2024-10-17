@@ -7,9 +7,18 @@ import {
   Duration,
 } from 'aws-cdk-lib';
 import * as IAM from 'aws-cdk-lib/aws-iam'
-import { Architecture, IDestination } from 'aws-cdk-lib/aws-lambda';
+import { Architecture, Function, IDestination } from 'aws-cdk-lib/aws-lambda';
 import { Bucket } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+
+import {
+  SqsDestination,
+  EventBridgeDestination,
+  SnsDestination,
+  LambdaDestination,
+} from 'aws-cdk-lib/aws-lambda-destinations'
+import { Queue } from 'aws-cdk-lib/aws-sqs';
+
 
 const { warn } = console;
 
@@ -55,8 +64,8 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
 
   // this definition in only to avoid initialization error
   // src/compute/lambda/function-construct.ts:45:3 - error TS2564: Property 'handlerFn' has no initializer and is not definitely assigned in the constructor.
-  
-  
+
+
   // [ ] Inicializar esta lambda asi sea con un hello world pa no romper cosas y bacano q tenga algo por defecto
 
   // @ts-ignore
@@ -93,11 +102,11 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     console.info(`creating layer ${name} using ${path}`);
 
     let code
-    if(path.startsWith('s3://')) {
+    if (path.startsWith('s3://')) {
       const [bucketName, key] = path.replace('s3://', '').split('/')
       console.log('bucketName, key', bucketName, key);
       const bucket = Bucket.fromBucketName(this, name + 'layer', bucketName)
-      
+
       code = Lambda.Code.fromBucket(bucket, key)
     }
 
@@ -115,6 +124,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     const layer = FunctionConstruct.layers[name];
     if (!layer) return warn(`layer ${name} not found!`);
     this.layersToUse.push(layer);
+    return this
   }
 
 
@@ -131,12 +141,33 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     return this.code(functionCode, options)
   }
 
-  then(destination: IDestination) {
-    this.onSuccess = destination
+  private getDestinationFromConstruct(construct: Construct): IDestination | undefined {
+
+    const fn = construct as Function
+    const queue = construct as Queue
+
+    console.log('\n\nASDASLDFJASKDLJAS:DKLJASD')
+
+    if (!!fn.addLayers) {
+      console.log('Es Lambda')
+      return new LambdaDestination(fn)
+    }
+    if(!!queue.queueArn) {
+      console.log('es SQS')
+      return new SqsDestination(queue)
+    }
+
+
   }
-  
-  catch(destination: IDestination) {
-    this.onFailure = destination
+
+  then(construct: Construct) {
+    this.onSuccess = this.getDestinationFromConstruct(construct)
+    return this
+  }
+
+  catch(construct: Construct) {
+    this.onFailure = this.getDestinationFromConstruct(construct)
+    return this
   }
 
 
@@ -179,11 +210,11 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       handler: 'index.handler',
       vpc,
       environment: { ...options.env },
-    } 
+    }
 
 
-    if(this.onSuccess) params['onSuccess'] = this.onSuccess
-    if(this.onFailure) params['onFailure'] = this.onFailure
+    if (this.onSuccess) params['onSuccess'] = this.onSuccess
+    if (this.onFailure) params['onFailure'] = this.onFailure
 
 
     const lambdaParams = params as Lambda.FunctionProps;
@@ -212,7 +243,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     //     options.access.forEach(fn => fn(lambda));
     // }
 
-    // return this.handlerFn;
+    return this.handlerFn;
   }
 
   /**
