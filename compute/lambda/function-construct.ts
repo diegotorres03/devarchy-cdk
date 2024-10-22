@@ -44,6 +44,7 @@ export interface FunctionOptions {
   readonly vpc?: EC2.Vpc | string;
   readonly memorySize?: Number | undefined
   readonly securityGroupIds?: string[];
+  readonly runtime?: Lambda.Runtime;
   readonly layers?: { name: string, path: string }[]; // Lambda.ILayerVersion[];
 }
 
@@ -152,7 +153,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       console.log('Es Lambda')
       return new LambdaDestination(fn)
     }
-    if(!!queue.queueArn) {
+    if (!!queue.queueArn) {
       console.log('es SQS')
       return new SqsDestination(queue)
     }
@@ -198,7 +199,8 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
 
 
     const params = {
-      runtime: Lambda.Runtime.NODEJS_LATEST,
+      // [ ] Allow for other runtimes
+      runtime: options.runtime || Lambda.Runtime.NODEJS_LATEST,
       code: getCode(functionCode),
       timeout: options.timeout || Duration.seconds(30),
       layers: this.layersToUse,
@@ -228,6 +230,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     // granting access to external resources
     if (Array.isArray(options.access)) {
       // options.access.forEach(accessFn => accessFn(this.handlerFn))
+      // @ts-ignore
       options.access.forEach(accessFn => accessFn(this))
     }
 
