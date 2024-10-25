@@ -106,15 +106,19 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     if (path.startsWith('s3://')) {
       const [bucketName, key] = path.replace('s3://', '').split('/')
       console.log('bucketName, key', bucketName, key);
+      // @ts-ignore
       const bucket = Bucket.fromBucketName(this, name + 'layer', bucketName)
 
       code = Lambda.Code.fromBucket(bucket, key)
+    } else {
+      code = Lambda.Code.fromAsset(path)
     }
 
 
+    // @ts-ignore
     const layer = new Lambda.LayerVersion(this, name, {
       removalPolicy: RemovalPolicy.DESTROY,
-      code: Lambda.Code.fromAsset(path), // './layers/dax'
+      code, // './layers/dax'
     });
     FunctionConstruct.layers[name] = layer;
     this.useLayer(name);
@@ -144,8 +148,8 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
 
   private getDestinationFromConstruct(construct: Construct): IDestination | undefined {
 
-    const fn = construct as Function
-    const queue = construct as Queue
+    const fn = construct as unknown as Function
+    const queue = construct as unknown as Queue
 
     console.log('\n\nASDASLDFJASKDLJAS:DKLJASD')
 
@@ -188,8 +192,11 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     let sgs;
     if (options.vpc) {
       vpc = options.vpc === 'default' ?
+
+        // @ts-ignore
         EC2.Vpc.fromLookup(this, 'default-vpc-' + name, { isDefault: true }) :
         options.vpc as EC2.Vpc;
+      // @ts-ignore
       sgs = [EC2.SecurityGroup.fromLookupByName(this, 'defaultSG-' + name, 'default', vpc)];
       //  sgs = Array.isArray(options.securityGroupIds) ? options.securityGroupIds
       //     .map(sgId => EC2.SecurityGroup.fromSecurityGroupId(this, 'sgid', sgId)) : []
@@ -224,6 +231,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     // onFailure: '',
     // onSuccess: this.
 
+      // @ts-ignore
     this.handlerFn = new Lambda.Function(this, name + '-handler', lambdaParams);
 
 
@@ -261,7 +269,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     if (!this.handlerFn) return console.error('handler function not defined');
 
     // if Dynamo
-    const table = construct as Dynamo.Table;
+    const table = construct as unknown as Dynamo.Table;
     this.handlerFn?.addEventSource(new LambdaEventSources.DynamoEventSource(table, {
       startingPosition: Lambda.StartingPosition.TRIM_HORIZON,
     }));
@@ -280,6 +288,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       ],
     })
 
+      // @ts-ignore
     const invokeLambdaRole = new IAM.Role(this, name, {
       assumedBy: new IAM.ServicePrincipal(servicePrincipal),
       inlinePolicies: {
