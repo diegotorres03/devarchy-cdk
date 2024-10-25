@@ -201,7 +201,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     const params = {
       // [ ] Allow for other runtimes
       runtime: options.runtime || Lambda.Runtime.NODEJS_LATEST,
-      code: getCode(functionCode),
+      code: getCode(this, functionCode),
       timeout: options.timeout || Duration.seconds(30),
       layers: this.layersToUse,
       memorySize: options.memorySize,
@@ -292,27 +292,24 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
 }
 
 
-function getCode(source: string) {
+function getCode(scope, source: string) {
   if (source.includes('s3://')) {
-    // const bucket = ''
-    // const key = ''
-    // return Lambda.Code.fromBucket(bucket, key)
-    console.warn('this method hasn`t being implemented');
+
+    const s3Url = new URL(source);
+    const bucketName = s3Url.hostname;
+    const key = s3Url.pathname.substring(1); // Remove leading '/'
+
+    if (!bucketName || !key) {
+      throw new Error('Invalid S3 URL format. Expected: s3://bucket-name/key');
+    }
+    console.log('bucketName', bucketName)
+    const bucket = Bucket.fromBucketName(scope, 'sourceCodeBucket' + Date.now() % 1000, bucketName)
+
+    return Lambda.Code.fromBucket(bucket, key)
   }
 
   if (source.includes('./')) return Lambda.Code.fromAsset(source);
 
-  //   const functionCodeStr = source
-  // if (source.includes('exports.handler = ')) {
-  //   // console.log('full function')
-  //   code = `(${source})()`;
-  // } else {
-  //   // console.log('handler function')
-  //   code = `(function() {
-  //           exports.handler = ${source}
-  //       })()`;
-  //   // console.log(code)
-  // }
 
   const code = source.includes('exports.handler = ') ? source : `exports.handler = ${source}`;
 
