@@ -60,7 +60,7 @@ export class RestApiConstruct extends Construct {
 
   private addCorsPreflight(resource: ApiGateway.IResource) {
     const path = resource.path;
-    if (!this.corsEnabledPaths.has(path)) {
+    if (!this.corsEnabledPaths.has(path) && this.corsOptions) {
       resource.addCorsPreflight(this.corsOptions);
       this.corsEnabledPaths.add(path);
     }
