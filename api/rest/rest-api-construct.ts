@@ -30,6 +30,8 @@ export class RestApiConstruct extends Construct {
   private currentHandler?: Lambda.Function;
   api: ApiGateway.RestApi;
   private corsOptions: any
+  private corsEnabledPaths: Set<string> = new Set();
+
 
 
   constructor(scope: Construct, id: string) {
@@ -56,6 +58,15 @@ export class RestApiConstruct extends Construct {
 
   }
 
+  private addCorsPreflight(resource: ApiGateway.IResource) {
+    const path = resource.path;
+    if (!this.corsEnabledPaths.has(path)) {
+      resource.addCorsPreflight(this.corsOptions);
+      this.corsEnabledPaths.add(path);
+    }
+  }
+  
+
   /**
    * enable cors for this API
    *
@@ -77,9 +88,12 @@ export class RestApiConstruct extends Construct {
     };
     this.corsOptions = options || defaultOptions;
 
-    this.api.root.addCorsPreflight(this.corsOptions);
+    // this.api.root.addCorsPreflight(this.corsOptions);
+    this.addCorsPreflight(this.api.root)
     return this;
   }
+
+
 
   /**
    * add a webapp construct on cors
@@ -193,7 +207,10 @@ export class RestApiConstruct extends Construct {
     const integration = new ApiGateway.LambdaIntegration(fn.handlerFn); // {proxy: true}
     const resource = this.api.root.resourceForPath(path)
     resource.addMethod(method, integration, integrationOptions);
-    resource.addCorsPreflight(this.corsOptions)
+
+    // resource.defaultCorsPreflightOptions
+    // resource.addCorsPreflight(this.corsOptions)
+    this.addCorsPreflight(resource)
 
 
     this.currentHandler = fn.handlerFn;
@@ -240,7 +257,8 @@ export class RestApiConstruct extends Construct {
 
     const resource = this.api.root.resourceForPath(path)
     resource.addMethod(method, integration, integrationOptions);
-    resource.addCorsPreflight(this.corsOptions)
+    // resource.addCorsPreflight(this.corsOptions)
+    this.addCorsPreflight(resource)
 
 
   }
@@ -258,7 +276,10 @@ export class RestApiConstruct extends Construct {
       }],
       authorizer: this.currentAuthorizer || undefined,
     });
-    resource.addCorsPreflight(this.corsOptions)
+    // resource.addCorsPreflight(this.corsOptions)
+    this.addCorsPreflight(resource)
+  
+  
   }
 
   private handleIntegration(
@@ -281,7 +302,8 @@ export class RestApiConstruct extends Construct {
           }],
           authorizer: this.currentAuthorizer || undefined,
         })
-        resource.addCorsPreflight(this.corsOptions)
+        // resource.addCorsPreflight(this.corsOptions)
+        this.addCorsPreflight(resource)
 
 
       }
