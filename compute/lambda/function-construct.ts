@@ -231,7 +231,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     // onFailure: '',
     // onSuccess: this.
 
-      // @ts-ignore
+    // @ts-ignore
     this.handlerFn = new Lambda.Function(this, name + '-handler', lambdaParams);
 
 
@@ -264,17 +264,29 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
    * @param {Construct} construct
    * @memberof FunctionConstruct
    */
-  trigger(construct: Construct) {
+  trigger(construct: Construct, options?: { batchSize: number, maxConcurrency: number }) {
     console.log(construct.constructor.name);
     if (!this.handlerFn) return console.error('handler function not defined');
 
     // if Dynamo
     const table = construct as unknown as Dynamo.Table;
-    this.handlerFn?.addEventSource(new LambdaEventSources.DynamoEventSource(table, {
-      startingPosition: Lambda.StartingPosition.TRIM_HORIZON,
-    }));
+    const queue = construct as unknown as Queue;
 
-    table.grantStreamRead(this.handlerFn);
+
+    if (table.tableArn) {
+      this.handlerFn?.addEventSource(new LambdaEventSources.DynamoEventSource(table, {
+        startingPosition: Lambda.StartingPosition.TRIM_HORIZON,
+      }));
+      table.grantStreamRead(this.handlerFn);
+    }
+
+    if (queue.queueArn) {
+      this.handlerFn?.addEventSource(new LambdaEventSources.SqsEventSource(queue, {
+        batchSize: options?.batchSize,
+        maxConcurrency: options?.maxConcurrency
+      }))
+    }
+
   }
 
   createServiceRole(name: string, servicePrincipal: string) {
@@ -288,7 +300,7 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
       ],
     })
 
-      // @ts-ignore
+    // @ts-ignore
     const invokeLambdaRole = new IAM.Role(this, name, {
       assumedBy: new IAM.ServicePrincipal(servicePrincipal),
       inlinePolicies: {
