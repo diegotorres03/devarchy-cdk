@@ -237,8 +237,8 @@ export class RestApiConstruct extends Construct {
           responseTemplates: { 
             // NOTE: Mock integration support for json, xml and html
             'application/json': JSON.stringify(mockResponse),
-            'application/xml': mockResponse,
-            'text/html': mockResponse,
+            'application/xml': mockResponse.xml,
+            'text/html': mockResponse.html,
           }
         },
       ],
