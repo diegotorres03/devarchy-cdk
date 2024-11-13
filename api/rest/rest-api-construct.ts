@@ -234,7 +234,12 @@ export class RestApiConstruct extends Construct {
       integrationResponses: [
         {
           statusCode: '200',
-          responseTemplates: { 'application/json': JSON.stringify(mockResponse) }
+          responseTemplates: { 
+            // NOTE: Mock integration support for json, xml and html
+            'application/json': JSON.stringify(mockResponse),
+            'application/xml': mockResponse,
+            'text/html': mockResponse,
+          }
         },
       ],
       passthroughBehavior: ApiGateway.PassthroughBehavior.NEVER,

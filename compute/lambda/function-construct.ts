@@ -151,14 +151,14 @@ export class FunctionConstruct extends Construct implements IAM.IGrantable {
     const fn = construct as unknown as Function
     const queue = construct as unknown as Queue
 
-    console.log('\n\nASDASLDFJASKDLJAS:DKLJASD')
+    console.log(Object.keys(construct))
 
-    if (!!fn.addLayers) {
+    if (!!fn.functionArn) {
       console.log('Es Lambda')
       return new LambdaDestination(fn)
     }
     if (!!queue.queueArn) {
-      console.log('es SQS')
+      console.log('es SQS', queue.queueName)
       return new SqsDestination(queue)
     }
 
