@@ -243,7 +243,11 @@ export class RestApiConstruct extends Construct {
         },
       ],
       passthroughBehavior: ApiGateway.PassthroughBehavior.NEVER,
-      requestTemplates: { 'application/json': '{ "statusCode": 200 }' },
+      requestTemplates: { 
+        'application/json': '{ "statusCode": 200 }', 
+        'application/xml': '{ "statusCode": 200 }', 
+        'text/html': '{ "statusCode": 200 }', 
+      },
     })
 
     // const integrationOptions: ApiGateway.MethodOptions = this.currentAuthorizer ?
