@@ -29,7 +29,7 @@ export class WebAppConstruct extends Construct {
 
   // private additionalBehaviors: CloudFront.BehaviorOptions[] = []
   cdnDistribution: CloudFront.Distribution;
-  private defaultOrigin: CloudFrontOrigins.S3Origin;
+  private defaultOrigin: CloudFrontOrigins.S3BucketOrigin;
   private pathPattern: string = '';
 
   webappBucket: S3.Bucket;
@@ -92,7 +92,7 @@ export class WebAppConstruct extends Construct {
         // origin: this.defaultOrigin,
         origin: new OriginGroup({
           primaryOrigin: S3BucketOrigin.withOriginAccessControl(this.webappBucket),
-          fallbackOrigin: new HttpOrigin('easyarchery.net'),
+          fallbackOrigin: new HttpOrigin('mega-cloud.io'),
           fallbackStatusCodes: [404],
         }),
         viewerProtocolPolicy: CloudFront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -185,12 +185,12 @@ export class WebAppConstruct extends Construct {
      * @memberof WebAppConstruct
      */
   addAssets(path: string, destinationPath?: string): WebAppConstruct {
-    new S3Deployment.BucketDeployment(this, 'deployStaticWebapp_' + WebAppConstruct.deployCount, {
+    WebAppConstruct.deployCount++
+    new S3Deployment.BucketDeployment(this, encodeURIComponent(path) + '-' + WebAppConstruct.deployCount, {
       sources: [S3Deployment.Source.asset(path)],
       destinationBucket: this.webappBucket,
       destinationKeyPrefix: destinationPath ? destinationPath : undefined,
     });
-    WebAppConstruct.deployCount++
     return this;
   }
 
@@ -215,10 +215,10 @@ export class WebAppConstruct extends Construct {
     return this;
   }
 
-  domainName(domainName: string): WebAppConstruct {
+  // domainName(domainName: string): WebAppConstruct {
 
-    return this
-  }
+  //   return this
+  // }
 
 
   path(pathPattern: string) {
