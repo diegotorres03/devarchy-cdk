@@ -41,7 +41,8 @@ export class WebSocketApiConstruct extends Construct {
     this.api.addRoute(routeName, {
       integration: new WebSocketLambdaIntegration(routeName, handler)
     })
-
+    
+    // [ ] add support for dynamo, sns, sqs and so on
 
   }
 

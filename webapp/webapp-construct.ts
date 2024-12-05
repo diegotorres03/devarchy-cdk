@@ -29,6 +29,7 @@ export class WebAppConstruct extends Construct {
 
   // private additionalBehaviors: CloudFront.BehaviorOptions[] = []
   cdnDistribution: CloudFront.Distribution;
+  // [ ] fix this
   private defaultOrigin: CloudFrontOrigins.S3BucketOrigin;
   private pathPattern: string = '';
 

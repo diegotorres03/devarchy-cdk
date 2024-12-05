@@ -616,9 +616,11 @@ export class RestApiConstruct extends Construct {
         // s3(params) { },
         // mock(params) { },
         // http(params) { },
-        fn(handlerFn: Lambda.Function) {
+        fn(handlerFn: FunctionConstruct | Lambda.Function) {
           // const integrationOptions = this.currentAuthorizer ? { authorizer: this.currentAuthorizer } : undefined;
-          const lambdaIntegration = new ApiGateway.LambdaIntegration(handlerFn)
+
+          const handler = handlerFn instanceof FunctionConstruct ? handlerFn.handlerFn : handlerFn
+          const lambdaIntegration = new ApiGateway.LambdaIntegration(handler)
           addMethod(lambdaIntegration)
         },
 

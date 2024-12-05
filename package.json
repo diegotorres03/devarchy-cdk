@@ -23,7 +23,7 @@
     "@aws-sdk/client-s3": "^3.654.0",
     "@lancedb/lancedb": "^0.10.0",
     "@langchain/textsplitters": "^0.1.0",
-    "aws-cdk-lib": "^2.164.1",
+    "aws-cdk-lib": "^2.171.1",
     "llm-chunk": "^0.0.1",
     "vectordb": "^0.10.0"
   }
