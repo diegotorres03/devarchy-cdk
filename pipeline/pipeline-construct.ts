@@ -12,7 +12,9 @@ import {
     RemovalPolicy,
     Duration,
 } from 'aws-cdk-lib'
+import { Artifact } from 'aws-cdk-lib/aws-codepipeline'
 import { CodeBuildProjectProps } from 'aws-cdk-lib/aws-events-targets'
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager'
 import { Construct } from 'constructs'
 
 const { log, warn, error } = console
@@ -71,7 +73,7 @@ const npmRunBuildspec = {
         build: {
             commands: [
                 'npm run build',
-                
+
                 // 'cdk deploy --all --require-approval never',
             ]
         },
@@ -87,7 +89,7 @@ export class PipeConstruct extends Construct {
 
     static DEPLOY_CDK = buildSpecForCDK
     static DEPLOY_NPM = npmRunBuildspec
-    
+
 
     pipeline: CodePipeline.Pipeline
     sourceOutput: CodePipeline.Artifact
@@ -99,7 +101,6 @@ export class PipeConstruct extends Construct {
 
         // CodePipeline.Artifact 
         this.sourceOutput = new CodePipeline.Artifact()
-
 
         this.account = props?.account || Stack.of(this).account || process.env.CDK_DEFAULT_ACCOUNT || 'no-account'
         this.region = props?.region || Stack.of(this).region || process.env.CDK_DEFAULT_REGION || 'no-region'
@@ -153,6 +154,27 @@ export class PipeConstruct extends Construct {
         return codeRepo
     }
 
+    /**
+     * set a github repository as the source action
+     *
+     * @param {string} owner
+     * @param {string} repo
+     * @param {{ tokenSecret: Secret, output?: Artifact }} options
+     * @memberof PipeConstruct
+     */
+    githubSource(owner: string, repo: string, options: { tokenSecret: Secret, output?: Artifact }) {
+
+        const gitHubSourceAction = new CodePipelineActions.GitHubSourceAction({
+            actionName: this.node.id + 'GitHub',
+            repo,
+            output: options?.output ?? new Artifact(),
+            owner,
+            oauthToken: options.tokenSecret.secretValue,
+        })
+
+        const sourceStage = this.pipeline.addStage({ stageName: 'Source' })
+        sourceStage.addAction(gitHubSourceAction)
+    }
 
     /**
      * set a codecommit repository as the source action
@@ -169,7 +191,6 @@ export class PipeConstruct extends Construct {
             output: this.sourceOutput,
             branch,
         })
-
 
         const sourceStage = this.pipeline.addStage({ stageName: 'Source' })
         sourceStage.addAction(sourceAction)
